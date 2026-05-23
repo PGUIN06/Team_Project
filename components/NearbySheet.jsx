@@ -10,14 +10,15 @@ import {
   Platform,
 } from 'react-native';
 import { COLORS, FONTS } from '../utils/theme';
-import { CAMPUS_SPOTS, ACTIVE_POOLS } from '../data/campusData';
+import { CAMPUS_SPOTS } from '../data/campusData';
 import { calcDistanceMeters, formatDistance, formatWalk } from '../utils/distance';
+import { formatPoolTimeStatus } from '../utils/time';
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const COLLAPSED_H = 200;
 const EXPANDED_H = SCREEN_H * 0.6;
 
-export default function NearbySheet({ expanded, onToggle, userLocation, onSpotPress }) {
+export default function NearbySheet({ expanded, onToggle, userLocation, pools, onSpotPress }) {
   const heightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
 
   useEffect(() => {
@@ -29,10 +30,13 @@ export default function NearbySheet({ expanded, onToggle, userLocation, onSpotPr
   }, [expanded]);
 
   // 거리순 정렬
-  const sortedPools = ACTIVE_POOLS.map((p) => {
-    const spot = CAMPUS_SPOTS.find((s) => s.id === p.spotId);
-    return { ...p, spot, dist: calcDistanceMeters(userLocation, spot) };
-  }).sort((a, b) => a.dist - b.dist);
+  const sortedPools = (pools || [])
+    .map((p) => {
+      const spot = CAMPUS_SPOTS.find((s) => s.id === p.spotId);
+      return { ...p, spot, dist: calcDistanceMeters(userLocation, spot) };
+    })
+    .filter((p) => p.spot) // 좌표 못 찾은 팟은 제외 (커스텀 핀 등)
+    .sort((a, b) => a.dist - b.dist);
 
   return (
     <Animated.View style={[styles.sheet, { height: heightAnim }]}>
@@ -97,7 +101,7 @@ function PoolRow({ pool, onPress }) {
               pool.status === 'ordered' ? styles.poolTimeActive : styles.poolTimeUrgent,
             ]}
           >
-            {pool.timeLeft}
+            {formatPoolTimeStatus(pool)}
           </Text>
         </View>
       </View>
@@ -126,7 +130,7 @@ function PoolCard({ pool, onPress }) {
             pool.status === 'ordered' ? styles.poolTimeActive : styles.poolTimeUrgent,
           ]}
         >
-          {pool.timeLeft}
+          {formatPoolTimeStatus(pool)}
         </Text>
       </View>
     </Pressable>

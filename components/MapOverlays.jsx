@@ -70,6 +70,17 @@ export function FAB({ active, onPress }) {
   );
 }
 
+// ============ 채팅 버튼 (내가 속한 팟 목록 열기) ============
+export function MyPotsButton({ onPress }) {
+  return (
+    <View style={styles.myPotsBtnWrap}>
+      <Pressable style={styles.myPotsBtn} onPress={onPress}>
+        <Text style={styles.myPotsIcon}>💬</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 // ============ 핀 모드 안내 토스트 (상단) ============
 export function PlacingHint() {
   const anim = useRef(new Animated.Value(0)).current;
@@ -189,6 +200,32 @@ const styles = StyleSheet.create({
     color: '#5C4100',
   },
   fabTextActive: { color: 'white' },
+
+  // MyPotsButton (FAB 위쪽)
+  myPotsBtnWrap: {
+    position: 'absolute',
+    right: 16,
+    bottom: 290,
+    zIndex: 7,
+  },
+  myPotsBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.15,
+        shadowRadius: 8,
+      },
+      android: { elevation: 4 },
+    }),
+  },
+  myPotsIcon: { fontSize: 22 },
 
   // Placing hint
   placingHint: {

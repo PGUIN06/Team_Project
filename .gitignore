@@ -21,6 +21,7 @@ android/
 .env
 .env.local
 .env.*.local
+.env*.save
 
 # OS
 .DS_Store

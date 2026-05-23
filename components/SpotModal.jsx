@@ -10,13 +10,13 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { COLORS, FONTS } from '../utils/theme';
-import { ACTIVE_POOLS } from '../data/campusData';
 import { calcDistanceMeters, formatDistance, formatWalk } from '../utils/distance';
+import { formatPoolTimeStatus } from '../utils/time';
 
-export default function SpotModal({ visible, spot, userLocation, onClose, onCreatePool, onShowToast }) {
+export default function SpotModal({ visible, spot, userLocation, pools, onClose, onCreatePool, onPotPress, onShowToast }) {
   if (!spot) return null;
 
-  const spotPools = ACTIVE_POOLS.filter((p) => p.spotId === spot.id);
+  const spotPools = pools || [];
   const dist = calcDistanceMeters(userLocation, spot);
 
   const handleCopy = async () => {
@@ -92,7 +92,11 @@ export default function SpotModal({ visible, spot, userLocation, onClose, onCrea
             </View>
           ) : (
             spotPools.map((p) => (
-              <View key={p.id} style={styles.poolRow}>
+              <Pressable
+                key={p.id}
+                style={styles.poolRow}
+                onPress={() => onPotPress?.(p)}
+              >
                 <View style={styles.poolEmojiWrap}>
                   <Text style={styles.poolEmoji}>{p.emoji}</Text>
                 </View>
@@ -112,11 +116,11 @@ export default function SpotModal({ visible, spot, userLocation, onClose, onCrea
                           : styles.poolTimeUrgent,
                       ]}
                     >
-                      {p.timeLeft}
+                      {formatPoolTimeStatus(p)}
                     </Text>
                   </View>
                 </View>
-              </View>
+              </Pressable>
             ))
           )}
 

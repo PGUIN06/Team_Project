@@ -19,18 +19,25 @@ import {
   LocateButton,
   FAB,
   PlacingHint,
+  MyPotsButton,
 } from './components/MapOverlays';
 import NearbySheet from './components/NearbySheet';
 import SpotModal from './components/SpotModal';
 import CustomPinModal from './components/CustomPinModal';
+import CreatePotModal from './components/CreatePotModal';
+import ChatScreen from './components/ChatScreen';
+import MyPotsList from './components/MyPotsList';
 import Toast from './components/Toast';
-
+import { supabase } from './lib/supabase';
 import {
-  CAMPUS_SPOTS,
-  POOL_COUNTS,
-  ACTIVE_POOLS,
-  CAMPUS_CENTER,
-} from './data/campusData';
+  fetchPotCounts,
+  fetchPotsBySpot,
+  fetchAllActivePots,
+  createPot,
+  joinPot,
+} from './lib/pots';
+
+import { CAMPUS_SPOTS, CAMPUS_CENTER } from './data/campusData';
 import { COLORS } from './utils/theme';
 
 export default function App() {
@@ -41,7 +48,79 @@ export default function App() {
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [customPin, setCustomPin] = useState(null);
   const [toast, setToast] = useState(null);
+  const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [poolCounts, setPoolCounts] = useState({});
+  const [spotPools, setSpotPools] = useState([]);
+  const [allPools, setAllPools] = useState([]);
+  const [createPotSpot, setCreatePotSpot] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [activePot, setActivePot] = useState(null);
+  const [showMyPots, setShowMyPots] = useState(false);
   const mapRef = useRef(null);
+
+  // 익명 로그인 (한 번만, AsyncStorage에 세션 저장됨)
+  useEffect(() => {
+    (async () => {
+      // 1) 이미 세션 있는지 확인 (AsyncStorage에서)
+      const { data: { session } } = await supabase.auth.getSession();
+
+      let currentUser = session?.user;
+
+      // 2) 없으면 익명 로그인
+      if (!currentUser) {
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) {
+          console.error('[auth] 익명 로그인 실패:', error.message);
+          setAuthReady(true); // 실패해도 앱은 띄움
+          return;
+        }
+        currentUser = data.user;
+      }
+
+      setUser(currentUser);
+
+      // profiles 조회 (트리거가 자동 생성한 닉네임 가져오기)
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', currentUser.id)
+        .single();
+
+      if (profileData) {
+        setProfile(profileData);
+      }
+
+      setAuthReady(true);
+      console.log('[auth] 로그인 완료, user.id =', currentUser?.id, 'nickname =', profileData?.nickname);
+    })();
+  }, []);
+
+  // 모든 스팟의 활성 팟 카운트 + 전체 목록 로드 (지도 마커 / NearbySheet용)
+  useEffect(() => {
+    if (!authReady) return;
+    (async () => {
+      const [counts, all] = await Promise.all([
+        fetchPotCounts(),
+        fetchAllActivePots(),
+      ]);
+      setPoolCounts(counts);
+      setAllPools(all);
+    })();
+  }, [authReady]);
+
+  // 선택된 스팟의 활성 팟 목록 로드
+  useEffect(() => {
+    if (!selectedSpot) {
+      setSpotPools([]);
+      return;
+    }
+    (async () => {
+      const pools = await fetchPotsBySpot(selectedSpot.id);
+      setSpotPools(pools);
+    })();
+  }, [selectedSpot]);
 
   // 폰트 로드
   useEffect(() => {
@@ -108,10 +187,66 @@ export default function App() {
     );
   };
 
-  // 팟 만들기
-  const handleCreatePool = (spotName) => {
-    showToast(`${spotName}에 새 팟을 만드는 중...`);
+  // "+ 이 위치에 팟 만들기" 버튼 누름 → SpotModal 닫고 CreatePotModal 열기
+  const handleCreatePool = () => {
+    setCreatePotSpot(selectedSpot);
     setSelectedSpot(null);
+  };
+
+  // CreatePotModal에서 "✓ 팟 만들기" 누름 → 실제 Supabase에 INSERT
+  const handleConfirmCreate = async (name, emoji, count) => {
+    if (!createPotSpot || creating) return;
+
+    setCreating(true);
+    const pot = await createPot({
+      name,
+      emoji,
+      spotId: createPotSpot.id,
+      maxMembers: count,
+    });
+    setCreating(false);
+
+    if (!pot) {
+      showToast('팟 생성 실패. 다시 시도해주세요.');
+      return;
+    }
+
+    showToast(`"${name}" 팟이 생성됐어요! 🎉`);
+    setCreatePotSpot(null);
+
+    // 데이터 새로고침 (카운트, 전체 목록)
+    const [counts, allPots] = await Promise.all([
+      fetchPotCounts(),
+      fetchAllActivePots(),
+    ]);
+    setPoolCounts(counts);
+    setAllPools(allPots);
+  };
+
+  // 활성 팟 카드 누름 → 가입 + 채팅방 열기
+  const handleOpenPotChat = async (pot) => {
+    if (!pot) return;
+
+    // 가입 (이미 멤버여도 23505 무해 처리됨)
+    const ok = await joinPot(pot.id);
+    if (!ok) {
+      showToast('팟 가입 실패. 다시 시도해주세요.');
+      return;
+    }
+
+    setSelectedSpot(null);  // SpotModal 닫기
+    setActivePot(pot);      // ChatScreen 열기
+  };
+
+  // MyPotsList에서 팟 누름 → 모달 닫고 채팅방 열기
+  const handleMyPotsItemPress = (pot) => {
+    setShowMyPots(false);
+    // fetchMyPots는 멤버 수를 안 줘서 기본값 채워서 전달 (ChatScreen 헤더용)
+    setActivePot({
+      ...pot,
+      current: 0,  // 정확한 값이 필요하면 14-c에서 보강
+      max: pot.max_members,
+    });
   };
 
   // 커스텀 핀 모달 확정
@@ -124,7 +259,7 @@ export default function App() {
     setCustomPin(null);
   };
 
-  if (!fontsLoaded) {
+  if (!fontsLoaded || !authReady) {
     return <View style={styles.loading} />;
   }
 
@@ -137,7 +272,7 @@ export default function App() {
           ref={mapRef}
           style={styles.map}
           spots={CAMPUS_SPOTS}
-          poolCounts={POOL_COUNTS}
+          poolCounts={poolCounts}
           userLocation={userLocation}
           customPin={customPin}
           placingMode={placingMode}
@@ -152,18 +287,23 @@ export default function App() {
           onSearch={() => showToast('검색 기능 준비 중')}
         />
 
-        {!placingMode && <PoolCounter count={ACTIVE_POOLS.length} />}
+        {!placingMode && (
+          <PoolCounter count={Object.values(poolCounts).reduce((a, b) => a + b, 0)} />
+        )}
         {placingMode && <PlacingHint />}
 
         <LocateButton onPress={locateUser} />
 
         <FAB active={placingMode} onPress={() => setPlacingMode(!placingMode)} />
 
+        {!placingMode && <MyPotsButton onPress={() => setShowMyPots(true)} />}
+
         {!placingMode && (
           <NearbySheet
             expanded={sheetExpanded}
             onToggle={() => setSheetExpanded(!sheetExpanded)}
             userLocation={userLocation}
+            pools={allPools}
             onSpotPress={handleSpotPress}
           />
         )}
@@ -173,8 +313,10 @@ export default function App() {
           visible={!!selectedSpot}
           spot={selectedSpot}
           userLocation={userLocation}
+          pools={spotPools}
           onClose={() => setSelectedSpot(null)}
           onCreatePool={handleCreatePool}
+          onPotPress={handleOpenPotChat}
           onShowToast={showToast}
         />
 
@@ -184,6 +326,28 @@ export default function App() {
           userLocation={userLocation}
           onClose={handleCustomClose}
           onConfirm={handleCustomConfirm}
+        />
+
+        <CreatePotModal
+          visible={!!createPotSpot}
+          spot={createPotSpot}
+          userLocation={userLocation}
+          submitting={creating}
+          onClose={() => setCreatePotSpot(null)}
+          onConfirm={handleConfirmCreate}
+        />
+
+        <ChatScreen
+          visible={!!activePot}
+          pot={activePot}
+          currentUser={user && profile ? { id: user.id, nickname: profile.nickname } : null}
+          onClose={() => setActivePot(null)}
+        />
+
+        <MyPotsList
+          visible={showMyPots}
+          onClose={() => setShowMyPots(false)}
+          onPotPress={handleMyPotsItemPress}
         />
 
         {/* 토스트 */}
