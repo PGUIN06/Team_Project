@@ -1,0 +1,61 @@
+{
+  "expo": {
+    "name": "대팟",
+    "slug": "daepot",
+    "version": "1.0.0",
+    "newArchEnabled": false,
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.daegu.daepot",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "내 주변 팟을 보여드리려면 위치 정보가 필요해요",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoadsInWebContent": true,
+          "NSExceptionDomains": {
+            "daumcdn.net": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionAllowsInsecureHTTPLoads": true
+            },
+            "kakao.com": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionAllowsInsecureHTTPLoads": true
+            }
+          }
+        }
+      }
+    },
+    "android": {
+      "package": "com.daegu.daepot",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "YOUR_GOOGLE_MAPS_ANDROID_API_KEY_HERE"
+        }
+      }
+    },
+    "extra": {
+      "kakaoRestApiKey": "YOUR_KAKAO_REST_API_KEY_HERE",
+      "kakaoJsApiKey": "YOUR_KAKAO_JS_API_KEY_HERE"
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "내 주변 팟을 보여드리려면 위치 정보가 필요해요"
+        }
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-splash-screen",
+      "expo-status-bar"
+    ]
+  }
+}

@@ -1,0 +1,34 @@
+# Dependencies
+node_modules/
+.expo/
+dist/
+npm-debug.*
+web-build/
+
+# Native projects (regenerated via `npx expo prebuild`)
+ios/
+android/
+
+# Signing / credentials
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Logs
+*.log
