@@ -292,7 +292,7 @@ function buildHTML(apiKey) {
     function init() {
       map = new kakao.maps.Map(document.getElementById('map'), {
         center: new kakao.maps.LatLng(35.9004, 128.8495),
-        level: 3
+        level: 4
       });
       kakao.maps.event.addListener(map, 'click', function(me) {
         var ll = me.latLng;

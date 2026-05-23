@@ -1,16 +1,23 @@
-# 대팟 (DaePot) — iOS
+# 대팟 (DaePot) — iOS + Android
 
 대구대 경산캠퍼스 배달 핀포인트 앱. React Native (Expo SDK 56) 기반.
 
-지도 엔진은 **카카오맵 JavaScript SDK + WebView** 조합. iOS 네이티브 빌드 (Xcode) 필요.
+지도 엔진은 **카카오맵 JavaScript SDK + WebView** 조합. iOS는 Xcode, Android는 Gradle/Android Studio로 네이티브 빌드.
 
 ## 사전 준비
 
+### 공통
 - Node.js 18+
-- macOS + Xcode (iOS 빌드)
+- 카카오 개발자 계정 (앱 만들고 JS 키 + REST 키 발급)
+
+### iOS 빌드용 (macOS만)
+- Xcode
 - CocoaPods (`brew install cocoapods`)
 - Watchman (`brew install watchman`)
-- 카카오 개발자 계정
+
+### Android 빌드용
+- Android Studio (Android SDK + Emulator + JDK 17 번들)
+- Android SDK 도구: **NDK** + **CMake 3.22.1** (Android Studio SDK Manager에서 설치)
 
 ## 빠른 시작
 
@@ -21,18 +28,45 @@ npm install
 # 2. 카카오 키 등록 (아래 "환경 변수" 섹션 참고)
 cp .env.example .env.local
 # .env.local 열어서 실제 키 채우기
+```
 
-# 3. iOS 네이티브 프로젝트 생성
+### iOS 빌드
+
+```bash
+# 네이티브 프로젝트 생성
 npx expo prebuild --platform ios
 
-# 4. CocoaPods 설치
+# CocoaPods 설치
 cd ios && pod install && cd ..
 
-# 5. Xcode로 열고 빌드
+# Xcode로 열고 빌드
 open ios/app.xcworkspace
 ```
 
 Xcode에서 폰 연결 → 디바이스 선택 → `Cmd+R`로 빌드 (Release 권장).
+
+### Android 빌드
+
+```bash
+# 네이티브 프로젝트 생성
+npx expo prebuild --platform android
+
+# 에뮬레이터 시작 (DNS 명시 필수, 아래 트러블슈팅 참고)
+~/Library/Android/sdk/emulator/emulator -avd <AVD_NAME> \
+  -dns-server 8.8.8.8,1.1.1.1 -no-snapshot-load &
+
+# Metro 서버 시작
+npx expo start &
+
+# 빌드 + 설치 + 실행
+cd android
+./gradlew app:assembleDebug
+~/Library/Android/sdk/platform-tools/adb reverse tcp:8081 tcp:8081
+~/Library/Android/sdk/platform-tools/adb install -r \
+  app/build/outputs/apk/debug/app-debug.apk
+~/Library/Android/sdk/platform-tools/adb shell am start \
+  -n com.daegu.daepot/.MainActivity
+```
 
 ## 환경 변수 (카카오 키)
 
@@ -74,7 +108,8 @@ KAKAO_REST_API_KEY=...    # REST API 키 (좌표→주소 변환용)
 │   ├── theme.js                    # 색상/폰트 상수
 │   ├── distance.js                 # Haversine 거리 계산
 │   └── geocoding.js                # 카카오 REST 좌표→주소
-└── ios/                            # Xcode 네이티브 프로젝트
+├── ios/                            # Xcode 네이티브 프로젝트 (gitignored)
+└── android/                        # Gradle 네이티브 프로젝트 (gitignored)
 ```
 
 ## 기능
@@ -87,22 +122,45 @@ KAKAO_REST_API_KEY=...    # REST API 키 (좌표→주소 변환용)
 - GPS 현재 위치
 - 토스트 알림
 
-## iOS 빌드 메모
+## 빌드 메모
 
+### 공통
 - **New Architecture(Fabric) 비활성화** 상태 (`app.json`의 `newArchEnabled: false`)
-- 빌드 모드: **Release 권장** — JS 번들이 앱에 박혀 Metro 없이 동작. (Debug 모드는 Metro 서버와 같은 와이파이 필수)
-- ATS 예외: `daumcdn.net`, `kakao.com` 도메인에 HTTP 허용 (카카오 SDK 내부 모듈 다운로드용)
+- 카카오 SDK가 일부 모듈을 HTTP로 다운로드해서 **평문 트래픽 허용 필수**
+  - iOS: `NSAppTransportSecurity` 예외 (`daumcdn.net`, `kakao.com`)
+  - Android: `android:usesCleartextTraffic="true"` in `<application>`
+
+### iOS
+- 빌드 모드: **Release 권장** — JS 번들이 앱에 박혀 Metro 없이 동작. (Debug는 Metro 서버와 같은 와이파이 필수)
 - 무료 Apple ID로 서명 시 앱이 7일 후 만료 → Xcode에서 다시 빌드하면 갱신
+
+### Android
+- Gradle 버전 **8.13** 사용 (9.x는 RN 플러그인 비호환, 8.10 이하는 AGP 비호환)
+- NDK **30.0.14904198** (또는 설치된 최신) 자동 사용 (`android/gradle.properties`의 `ndkVersion`)
+- CMake **3.22.1** 필수 (Android Studio SDK Manager → SDK Tools → "Show Package Details" 켜고 설치)
+- New Architecture는 `android/gradle.properties`에 `newArchEnabled=false`로 별도 설정 필요
+- 에뮬레이터는 **`-dns-server 8.8.8.8,1.1.1.1` 옵션 필수** (핫스팟/특수 네트워크 환경에서 DNS 안 풀림)
+- Debug 빌드 시 `adb reverse tcp:8081 tcp:8081`로 Metro 포트 포워딩
 
 ## 알려진 한계
 
 - **카카오맵이 WebView 안에서 동작** → 순수 네이티브 대비 약간의 성능 손해 (대부분의 경우 체감 거의 없음)
-- **iOS 전용** — Android는 별도 prebuild + Google Maps 키 필요 (현재 설정 안 됨)
-- **개발자 모드 폰** + Xcode 빌드 필요 (App Store 배포 X)
+- **개발자 모드 폰** + Xcode/Android Studio 빌드 필요 (App Store / Play Store 배포 X)
 
 ## 트러블슈팅
 
+### 공통
 - **흰 화면 (지도 안 뜸)**: 카카오 콘솔의 JavaScript SDK 도메인에 `http://localhost` 등록됐는지 확인
+- **`expo-asset` not found**: `npx expo install --fix` 실행
+
+### iOS
 - **`No script URL provided`**: Debug 빌드에서 Metro 서버와 같은 와이파이가 아님 → Release 빌드로 전환 권장
 - **빌드 중 ReactCodegen 에러**: `ios/` 폴더 지우고 `npx expo prebuild --platform ios --clean` 다시
-- **`expo-asset` not found**: `npx expo install --fix` 실행
+
+### Android
+- **`Class JvmVendorSpec does not have member field IBM_SEMERU`**: Gradle 9.x 비호환. `android/gradle/wrapper/gradle-wrapper.properties`에서 `gradle-8.13-bin.zip`으로 변경
+- **`NDK not configured`**: Android Studio SDK Manager에서 NDK 설치. 설치된 버전을 `android/gradle.properties`의 `ndkVersion=`에 명시
+- **`CMake '3.22.1' was not found`**: SDK Manager → SDK Tools → "Show Package Details" 켜고 CMake 3.22.1 설치
+- **`Could not find com.kakao.sdk:...`**: 안 쓰는 `@react-native-kakao/*` 패키지가 npm에 있으면 자동 링크되어 충돌. 제거 (`npm uninstall @react-native-kakao/core @react-native-kakao/map`)
+- **에뮬레이터에서 지도 안 뜨고 `ERR_NAME_NOT_RESOLVED`**: DNS 문제. 에뮬레이터 시작할 때 `-dns-server 8.8.8.8,1.1.1.1` 옵션 추가
+- **에뮬레이터 시작 직후 크래시 (macOS Tahoe 26+)**: 에뮬레이터를 다시 시작하면 보통 풀림
