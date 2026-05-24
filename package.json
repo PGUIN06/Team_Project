@@ -12,6 +12,8 @@
     "@expo-google-fonts/black-han-sans": "^0.2.3",
     "@expo-google-fonts/noto-sans-kr": "^0.2.3",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-navigation/bottom-tabs": "^7.16.1",
+    "@react-navigation/native": "^7.2.4",
     "@supabase/supabase-js": "^2.106.1",
     "expo": "^56.0.3",
     "expo-asset": "~56.0.13",
@@ -24,6 +26,7 @@
     "react-native": "0.85.3",
     "react-native-gifted-chat": "^3.3.3",
     "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "4.25.2",
     "react-native-url-polyfill": "^3.0.0",
     "react-native-webview": "13.16.1"
   },
