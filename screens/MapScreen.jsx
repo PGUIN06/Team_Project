@@ -10,7 +10,6 @@ import {
   LocateButton,
   FAB,
   PlacingHint,
-  MyPotsButton,
 } from '../components/MapOverlays';
 import NearbySheet from '../components/NearbySheet';
 import SpotModal from '../components/SpotModal';
@@ -18,7 +17,6 @@ import CustomPinModal from '../components/CustomPinModal';
 import CreatePotModal from '../components/CreatePotModal';
 import Toast from '../components/Toast';
 import ChatScreen from '../components/ChatScreen';
-import MyPotsList from '../components/MyPotsList';
 import { CAMPUS_SPOTS, CAMPUS_CENTER } from '../data/campusData';
 import { COLORS } from '../utils/theme';
 import {
@@ -54,7 +52,6 @@ export default function MapScreen({ user, profile }) {
   const [createPotSpot, setCreatePotSpot] = useState(null);
   const [creating, setCreating] = useState(false);
   const [activePot, setActivePot] = useState(null);
-  const [showMyPots, setShowMyPots] = useState(false);
 
   const mapRef = useRef(null);
 
@@ -197,18 +194,6 @@ export default function MapScreen({ user, profile }) {
     setActivePot(pot);
   };
 
-  // MyPotsList에서 팟 누름 → 모달 닫고 채팅방 열기
-  const handleMyPotsItemPress = (pot) => {
-    setShowMyPots(false);
-    setActivePot({
-      ...pot,
-      current: 0,
-      max: pot.max_members,
-    });
-  };
-
-  // TODO: 15-b-4에서 JSX 옮길 예정
-
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
@@ -240,8 +225,6 @@ export default function MapScreen({ user, profile }) {
       <LocateButton onPress={locateUser} />
 
       <FAB active={placingMode} onPress={() => setPlacingMode(!placingMode)} />
-
-      {!placingMode && <MyPotsButton onPress={() => setShowMyPots(true)} />}
 
       {!placingMode && (
         <NearbySheet
@@ -287,12 +270,6 @@ export default function MapScreen({ user, profile }) {
         pot={activePot}
         currentUser={user && profile ? { id: user.id, nickname: profile.nickname } : null}
         onClose={() => setActivePot(null)}
-      />
-
-      <MyPotsList
-        visible={showMyPots}
-        onClose={() => setShowMyPots(false)}
-        onPotPress={handleMyPotsItemPress}
       />
 
       {/* 토스트 */}
