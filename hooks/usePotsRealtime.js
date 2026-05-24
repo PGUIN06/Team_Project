@@ -31,6 +31,18 @@ export function usePotsRealtime(onChange, enabled = true, channelName = 'pots-ch
           onChange();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',           // 멤버 가입/탈퇴 시 카운트 갱신
+          schema: 'public',
+          table: 'pot_members',
+        },
+        (payload) => {
+          console.log('[realtime:pot_members]', payload.eventType, payload.new?.pot_id || payload.old?.pot_id);
+          onChange();
+        }
+      )
       .subscribe();
 
     return () => {
