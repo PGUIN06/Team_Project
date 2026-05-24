@@ -141,7 +141,14 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
           <View style={styles.titleWrap}>
             <Text style={styles.emoji}>{pot.emoji}</Text>
             <View style={{ flex: 1 }}>
-              <Text style={styles.title} numberOfLines={1}>{pot.name}</Text>
+              <View style={styles.nameRow}>
+                <Text style={styles.title} numberOfLines={1}>{pot.name}</Text>
+                {pot.isClosed && (
+                  <View style={styles.closedBadge}>
+                    <Text style={styles.closedBadgeText}>마감</Text>
+                  </View>
+                )}
+              </View>
               <Text style={styles.subtitle}>
                 {pot.current}/{pot.max}명
               </Text>
@@ -252,10 +259,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   emoji: { fontSize: 24 },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   title: {
     fontSize: 16,
     fontFamily: FONTS.bold,
     color: COLORS.text1,
+  },
+  closedBadge: {
+    backgroundColor: COLORS.coral + '20',  // 코랄 + 알파 (~12%)
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  closedBadgeText: {
+    fontSize: 10,
+    fontFamily: FONTS.bold,
+    color: COLORS.coral,
   },
   subtitle: {
     fontSize: 11,

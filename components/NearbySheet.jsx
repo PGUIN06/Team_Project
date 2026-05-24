@@ -15,7 +15,7 @@ import { calcDistanceMeters, formatDistance, formatWalk } from '../utils/distanc
 import { formatPoolTimeStatus } from '../utils/time';
 
 const { height: SCREEN_H } = Dimensions.get('window');
-const COLLAPSED_H = 200;
+const COLLAPSED_H = 240;
 const EXPANDED_H = SCREEN_H * 0.6;
 
 export default function NearbySheet({ expanded, onToggle, userLocation, pools, onSpotPress }) {
@@ -221,10 +221,12 @@ const styles = StyleSheet.create({
   // Pool card (horizontal)
   poolCard: {
     width: 180,
+    height: 130,
     padding: 12,
     backgroundColor: COLORS.surface2,
     borderRadius: 16,
     marginRight: 8,
+    justifyContent: 'space-between',
   },
   poolCardTop: {
     flexDirection: 'row',

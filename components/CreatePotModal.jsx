@@ -14,11 +14,17 @@ import { calcDistanceMeters, formatDistance, formatWalk } from '../utils/distanc
 
 const EMOJIS = ['🍗', '🍕', '🍔', '🌶️', '🍙', '🍲', '🍜', '🥘', '☕', '🍱', '🧁', '🥩'];
 const COUNTS = [2, 3, 4, 5, 6];
+const DURATIONS = [
+  { mins: 30, label: '30분' },
+  { mins: 60, label: '1시간' },
+  { mins: 120, label: '2시간' },
+];
 
 export default function CreatePotModal({ visible, spot, userLocation, onClose, onConfirm, submitting }) {
   const [poolName, setPoolName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🍗');
   const [selectedCount, setSelectedCount] = useState(4);
+  const [durationMinutes, setDurationMinutes] = useState(30);
 
   // 모달 열릴 때마다 폼 리셋
   useEffect(() => {
@@ -26,6 +32,7 @@ export default function CreatePotModal({ visible, spot, userLocation, onClose, o
       setPoolName('');
       setSelectedEmoji('🍗');
       setSelectedCount(4);
+      setDurationMinutes(30);
     }
   }, [visible]);
 
@@ -129,10 +136,36 @@ export default function CreatePotModal({ visible, spot, userLocation, onClose, o
             </View>
           </View>
 
+          {/* 모집 시간 */}
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>모집 시간</Text>
+            <View style={styles.durationRow}>
+              {DURATIONS.map(({ mins, label }) => (
+                <Pressable
+                  key={mins}
+                  style={[
+                    styles.durationChip,
+                    durationMinutes === mins && styles.durationChipActive,
+                  ]}
+                  onPress={() => setDurationMinutes(mins)}
+                >
+                  <Text
+                    style={[
+                      styles.durationChipText,
+                      durationMinutes === mins && styles.durationChipTextActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
           <Pressable
             style={[styles.confirmBtn, !canConfirm && styles.confirmBtnDisabled]}
             disabled={!canConfirm}
-            onPress={() => onConfirm(poolName.trim(), selectedEmoji, selectedCount)}
+            onPress={() => onConfirm(poolName.trim(), selectedEmoji, selectedCount, durationMinutes)}
           >
             <Text style={styles.confirmBtnText}>
               {submitting ? '만드는 중...' : '✓ 팟 만들기'}
@@ -222,6 +255,22 @@ const styles = StyleSheet.create({
   countBtnActive: { backgroundColor: COLORS.primary },
   countBtnText: { fontSize: 14, fontFamily: FONTS.bold, color: COLORS.text1 },
   countBtnTextActive: { color: 'white' },
+  durationRow: { flexDirection: 'row', gap: 8 },
+  durationChip: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: COLORS.surface2,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  durationChipActive: {
+    backgroundColor: COLORS.primary,
+    borderColor: COLORS.primary,
+  },
+  durationChipText: { fontSize: 13, fontFamily: FONTS.bold, color: COLORS.text2 },
+  durationChipTextActive: { color: 'white' },
   confirmBtn: {
     paddingVertical: 14,
     borderRadius: 16,

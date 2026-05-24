@@ -39,6 +39,15 @@ export default function ChatTabScreen({ user, profile }) {
   // Realtime — pots 테이블 변경 시 목록 자동 갱신
   usePotsRealtime(loadMyPots, !!user, 'pots-chat');
 
+  // 1분마다 자동 갱신 (시간 만료/곧 만료 상태 반영)
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      loadMyPots();
+    }, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user, loadMyPots]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadMyPots();
@@ -46,11 +55,7 @@ export default function ChatTabScreen({ user, profile }) {
   }, [loadMyPots]);
 
   const handlePotPress = (pot) => {
-    setActivePot({
-      ...pot,
-      current: 0,  // fetchMyPots는 멤버 수 안 줘서 임시
-      max: pot.max_members,
-    });
+    setActivePot(pot);
   };
 
   const renderPotCard = ({ item }) => {
@@ -68,13 +73,7 @@ export default function ChatTabScreen({ user, profile }) {
             {spot && (
               <Text style={styles.cardLocation}>📍 {spot.short}</Text>
             )}
-            <Text style={styles.cardStatus}>
-              {item.status === 'ordered'
-                ? '주문중'
-                : item.status === 'closed'
-                ? '마감'
-                : '모집중'}
-            </Text>
+            <Text style={styles.cardStatus}>참여중</Text>
           </View>
         </View>
         <Text style={styles.cardArrow}>›</Text>

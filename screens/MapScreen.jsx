@@ -75,6 +75,15 @@ export default function MapScreen({ user, profile }) {
   // Realtime — pots 변경 시 카운트/목록 자동 갱신
   usePotsRealtime(refreshPots, !!user, 'pots-map');
 
+  // 1분마다 자동 갱신 (시간 만료/곧 만료 상태 반영)
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      refreshPots();
+    }, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user, refreshPots]);
+
   // 선택된 스팟의 활성 팟 목록 (SpotModal용)
   useEffect(() => {
     if (!selectedSpot) {
@@ -149,7 +158,7 @@ export default function MapScreen({ user, profile }) {
   };
 
   // CreatePotModal 폼 제출 → 실제 Supabase INSERT
-  const handleConfirmCreate = async (name, emoji, count) => {
+  const handleConfirmCreate = async (name, emoji, count, durationMinutes) => {
     if (!createPotSpot || creating) return;
 
     setCreating(true);
@@ -158,6 +167,7 @@ export default function MapScreen({ user, profile }) {
       emoji,
       spotId: createPotSpot.id,
       maxMembers: count,
+      durationMinutes,
     });
     setCreating(false);
 

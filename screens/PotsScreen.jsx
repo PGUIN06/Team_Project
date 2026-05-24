@@ -12,7 +12,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { COLORS, FONTS } from '../utils/theme';
-import { fetchAllActivePots, joinPot } from '../lib/pots';
+import { fetchPotsForList, joinPot } from '../lib/pots';
 import { CAMPUS_SPOTS } from '../data/campusData';
 import { formatPoolTimeStatus } from '../utils/time';
 import ChatScreen from '../components/ChatScreen';
@@ -39,7 +39,7 @@ export default function PotsScreen({ user, profile }) {
 
   // 데이터 로드
   const loadPots = useCallback(async () => {
-    const data = await fetchAllActivePots();
+    const data = await fetchPotsForList();
     setPots(data);
   }, []);
 
@@ -54,6 +54,15 @@ export default function PotsScreen({ user, profile }) {
 
   // Realtime — pots 변경 시 목록 자동 갱신
   usePotsRealtime(loadPots, !!user, 'pots-list');
+
+  // 1분마다 자동 갱신 (시간 만료/곧 만료 상태 반영)
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      loadPots();
+    }, 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user, loadPots]);
 
   // Pull to refresh
   const onRefresh = useCallback(async () => {
@@ -70,8 +79,13 @@ export default function PotsScreen({ user, profile }) {
     return cat.emojis.includes(pot.emoji);
   });
 
-  // 팟 카드 누름 → 가입 + 채팅방
+  // 팟 카드 누름 → (마감 아니면 가입 후) 채팅방
   const handlePotPress = async (pot) => {
+    // 마감된 팟은 가입 시도 없이 바로 채팅방 (이미 멤버라면 입장, 아니면 ChatScreen 헤더만 보임)
+    if (pot.isClosed) {
+      setActivePot(pot);
+      return;
+    }
     const ok = await joinPot(pot.id);
     if (!ok) return;
     setActivePot(pot);
@@ -79,11 +93,13 @@ export default function PotsScreen({ user, profile }) {
 
   const renderPotCard = ({ item }) => {
     const spot = CAMPUS_SPOTS.find((s) => s.id === item.spotId);
-    const isFull = item.current >= item.max;
     const statusLabel = formatPoolTimeStatus(item);
 
     return (
-      <Pressable style={styles.card} onPress={() => handlePotPress(item)}>
+      <Pressable
+        style={[styles.card, item.isClosed && styles.cardClosed]}
+        onPress={() => handlePotPress(item)}
+      >
         <View style={styles.cardEmojiWrap}>
           <Text style={styles.cardEmoji}>{item.emoji}</Text>
         </View>
@@ -102,14 +118,14 @@ export default function PotsScreen({ user, profile }) {
             <Text
               style={[
                 styles.cardStatus,
-                item.status === 'ordered'
+                item.isClosed
+                  ? styles.statusClosed
+                  : item.status === 'ordered'
                   ? styles.statusOrdered
-                  : isFull
-                  ? styles.statusFull
                   : styles.statusOpen,
               ]}
             >
-              {statusLabel || (isFull ? '마감' : '모집중')}
+              {item.isClosed ? '마감' : (statusLabel || '모집중')}
             </Text>
           </View>
         </View>
@@ -262,6 +278,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
+  cardClosed: {
+    opacity: 0.6,
+  },
   cardEmojiWrap: {
     width: 56,
     height: 56,
@@ -304,6 +323,7 @@ const styles = StyleSheet.create({
   statusOpen: { color: COLORS.coral },
   statusOrdered: { color: COLORS.success },
   statusFull: { color: COLORS.text3 },
+  statusClosed: { color: COLORS.coral },
   cardArrow: {
     fontSize: 24,
     color: COLORS.text3,
