@@ -1,5 +1,5 @@
 // screens/MapScreen.jsx — 지도 화면 (App.js에서 분리)
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import KakaoMapWebView from '../components/KakaoMapWebView';
@@ -17,6 +17,7 @@ import CustomPinModal from '../components/CustomPinModal';
 import CreatePotModal from '../components/CreatePotModal';
 import Toast from '../components/Toast';
 import ChatScreen from '../components/ChatScreen';
+import { usePotsRealtime } from '../hooks/usePotsRealtime';
 import { CAMPUS_SPOTS, CAMPUS_CENTER } from '../data/campusData';
 import { COLORS } from '../utils/theme';
 import {
@@ -57,17 +58,22 @@ export default function MapScreen({ user, profile }) {
 
   // ============ Data fetching ============
   // 모든 스팟 카운트 + 전체 활성 팟 (지도 마커 + NearbySheet용)
+  const refreshPots = useCallback(async () => {
+    const [counts, all] = await Promise.all([
+      fetchPotCounts(),
+      fetchAllActivePots(),
+    ]);
+    setPoolCounts(counts);
+    setAllPools(all);
+  }, []);
+
   useEffect(() => {
     if (!user) return;
-    (async () => {
-      const [counts, all] = await Promise.all([
-        fetchPotCounts(),
-        fetchAllActivePots(),
-      ]);
-      setPoolCounts(counts);
-      setAllPools(all);
-    })();
-  }, [user]);
+    refreshPots();
+  }, [user, refreshPots]);
+
+  // Realtime — pots 변경 시 카운트/목록 자동 갱신
+  usePotsRealtime(refreshPots, !!user, 'pots-map');
 
   // 선택된 스팟의 활성 팟 목록 (SpotModal용)
   useEffect(() => {
@@ -162,14 +168,7 @@ export default function MapScreen({ user, profile }) {
 
     showToast(`"${name}" 팟이 생성됐어요! 🎉`);
     setCreatePotSpot(null);
-
-    // 데이터 새로고침
-    const [counts, allPots] = await Promise.all([
-      fetchPotCounts(),
-      fetchAllActivePots(),
-    ]);
-    setPoolCounts(counts);
-    setAllPools(allPots);
+    // (Realtime이 자동으로 카운트/목록 갱신)
   };
 
   // 커스텀 핀 모달 확정 (지금은 토스트만 — 추후 createPot 호출로 확장 가능)

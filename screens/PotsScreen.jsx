@@ -16,6 +16,7 @@ import { fetchAllActivePots, joinPot } from '../lib/pots';
 import { CAMPUS_SPOTS } from '../data/campusData';
 import { formatPoolTimeStatus } from '../utils/time';
 import ChatScreen from '../components/ChatScreen';
+import { usePotsRealtime } from '../hooks/usePotsRealtime';
 
 // 카테고리 정의 (emoji 기반 매핑)
 const CATEGORIES = [
@@ -50,6 +51,9 @@ export default function PotsScreen({ user, profile }) {
       setLoading(false);
     })();
   }, [user, loadPots]);
+
+  // Realtime — pots 변경 시 목록 자동 갱신
+  usePotsRealtime(loadPots, !!user, 'pots-list');
 
   // Pull to refresh
   const onRefresh = useCallback(async () => {
