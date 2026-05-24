@@ -8,10 +8,11 @@ import {
   SafeAreaView,
   Platform,
   KeyboardAvoidingView,
+  Alert,
 } from 'react-native';
 import { GiftedChat, Bubble, InputToolbar, Send } from 'react-native-gifted-chat';
 import { COLORS, FONTS } from '../utils/theme';
-import { fetchMessages, sendMessage } from '../lib/pots';
+import { fetchMessages, sendMessage, closePot } from '../lib/pots';
 import { supabase } from '../lib/supabase';
 
 export default function ChatScreen({ visible, pot, currentUser, onClose }) {
@@ -94,6 +95,34 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
     }
   }, [pot?.id]);
 
+  // 팟 종료 (방장만)
+  const handleClose = () => {
+    Alert.alert(
+      '팟 종료',
+      '정말 이 팟을 종료하시겠어요?\n종료 후에는 채팅방이 사라집니다.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '종료',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await closePot(pot.id);
+            if (ok) {
+              onClose();  // 채팅방 모달 닫기
+            } else {
+              Alert.alert('오류', '종료에 실패했어요. 잠시 후 다시 시도해주세요.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // 방장 여부 판단 (DB 원본 created_by + 클라 변환된 createdBy 둘 다 대응)
+  const isOwner =
+    !!currentUser?.id &&
+    (pot?.createdBy === currentUser.id || pot?.created_by === currentUser.id);
+
   if (!pot) return null;
 
   return (
@@ -118,7 +147,13 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
               </Text>
             </View>
           </View>
-          <View style={styles.backBtnPlaceholder} />
+          {isOwner ? (
+            <Pressable onPress={handleClose} style={styles.menuBtn}>
+              <Text style={styles.menuText}>⋯</Text>
+            </Pressable>
+          ) : (
+            <View style={styles.backBtnPlaceholder} />
+          )}
         </View>
 
         {/* Chat */}
@@ -192,6 +227,17 @@ const styles = StyleSheet.create({
   },
   backBtnPlaceholder: {
     minWidth: 60,
+  },
+  menuBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    minWidth: 60,
+    alignItems: 'flex-end',
+  },
+  menuText: {
+    fontSize: 24,
+    color: COLORS.text2,
+    fontWeight: 'bold',
   },
   backText: {
     fontSize: 16,

@@ -14,6 +14,7 @@ import { COLORS, FONTS } from '../utils/theme';
 import { fetchMyPots } from '../lib/pots';
 import { CAMPUS_SPOTS } from '../data/campusData';
 import ChatScreen from '../components/ChatScreen';
+import { usePotsRealtime } from '../hooks/usePotsRealtime';
 
 export default function ChatTabScreen({ user, profile }) {
   const [pots, setPots] = useState([]);
@@ -34,6 +35,9 @@ export default function ChatTabScreen({ user, profile }) {
       setLoading(false);
     })();
   }, [user, loadMyPots]);
+
+  // Realtime — pots 테이블 변경 시 목록 자동 갱신
+  usePotsRealtime(loadMyPots, !!user, 'pots-chat');
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
