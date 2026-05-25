@@ -9,10 +9,12 @@ const KakaoMapWebView = forwardRef(function KakaoMapWebView(
   {
     spots = [],
     poolCounts = {},
+    customPots = [],
     userLocation,
     customPin,
     placingMode = false,
     onSpotPress,
+    onCustomPotPress,
     onMapPress,
     style,
   },
@@ -63,6 +65,24 @@ const KakaoMapWebView = forwardRef(function KakaoMapWebView(
     });
   }, [spots, poolCounts, send]);
 
+  // 임의 위치 팟 마커 — 노란 핀 + 이모지 + 카운트
+  useEffect(() => {
+    send({
+      type: 'setCustomPots',
+      pots: customPots
+        .filter((p) => p.latitude != null && p.longitude != null)
+        .map((p) => ({
+          id: p.id,
+          lat: Number(p.latitude),
+          lng: Number(p.longitude),
+          emoji: p.emoji || '🍗',
+          name: p.name || '',
+          current: p.current ?? 0,
+          max: p.max ?? 0,
+        })),
+    });
+  }, [customPots, send]);
+
   useEffect(() => {
     if (userLocation) {
       send({ type: 'setUser', lat: userLocation.lat, lng: userLocation.lng });
@@ -94,6 +114,9 @@ const KakaoMapWebView = forwardRef(function KakaoMapWebView(
     } else if (data.type === 'spotPress') {
       const spot = spots.find((s) => s.id === data.id);
       if (spot) onSpotPress?.(spot);
+    } else if (data.type === 'customPotPress') {
+      const pot = customPots.find((p) => p.id === data.id);
+      if (pot) onCustomPotPress?.(pot);
     } else if (data.type === 'mapPress') {
       // Mimic react-native-maps' event shape so the existing App.js handler works as-is
       onMapPress?.({
@@ -171,6 +194,18 @@ function buildHTML(apiKey) {
       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
       border: 2px solid white;
     }
+    /* 임의 위치 팟 마커 — 캠퍼스 스팟과 구분 (노란색 + 이모지) */
+    .cp-wrap { position: relative; cursor: pointer; pointer-events: auto; }
+    .cp-pin {
+      width: 36px; height: 36px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      background: #FCD34D;
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .cp-emoji { transform: rotate(45deg); font-size: 16px; line-height: 1; }
     body.placing #map { cursor: crosshair; }
   </style>
   <script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=${apiKey}&autoload=true"></script>
@@ -180,6 +215,7 @@ function buildHTML(apiKey) {
   <script>
     var map = null;
     var overlays = {};
+    var customPotOverlays = {};
     var userOverlay = null;
     var pinOverlay = null;
 
@@ -193,9 +229,18 @@ function buildHTML(apiKey) {
       post({ type: 'spotPress', id: id });
     };
 
+    window.__handleCustomPotClick = function(id) {
+      post({ type: 'customPotPress', id: id });
+    };
+
     function clearSpots() {
       Object.keys(overlays).forEach(function(id) { overlays[id].setMap(null); });
       overlays = {};
+    }
+
+    function clearCustomPots() {
+      Object.keys(customPotOverlays).forEach(function(id) { customPotOverlays[id].setMap(null); });
+      customPotOverlays = {};
     }
 
     function escapeHtml(s) {
@@ -226,6 +271,31 @@ function buildHTML(apiKey) {
           clickable: true
         });
         overlays[s.id] = ov;
+      });
+    }
+
+    function setCustomPots(pots) {
+      clearCustomPots();
+      pots.forEach(function(p) {
+        var idAttr = escapeHtml(p.id);
+        var emoji = escapeHtml(p.emoji);
+        var name = escapeHtml(p.name);
+        var countTxt = p.current + '/' + p.max;
+        var html =
+          '<div class="cp-wrap" onclick="window.__handleCustomPotClick(\\''+idAttr+'\\')">' +
+            '<div class="cp-pin"><span class="cp-emoji">'+emoji+'</span></div>' +
+            '<div class="m-label">'+name+' '+countTxt+'</div>' +
+          '</div>';
+        var ov = new kakao.maps.CustomOverlay({
+          map: map,
+          position: new kakao.maps.LatLng(p.lat, p.lng),
+          content: html,
+          xAnchor: 0.5,
+          yAnchor: 1,
+          zIndex: 3,
+          clickable: true
+        });
+        customPotOverlays[p.id] = ov;
       });
     }
 
@@ -277,6 +347,7 @@ function buildHTML(apiKey) {
         var data = JSON.parse(msg);
         switch (data.type) {
           case 'setSpots': setSpots(data.spots); break;
+          case 'setCustomPots': setCustomPots(data.pots); break;
           case 'setUser': setUser(data.lat, data.lng); break;
           case 'setCustomPin': setCustomPin(data.pin); break;
           case 'setPlacingMode':

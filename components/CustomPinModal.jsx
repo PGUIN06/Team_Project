@@ -15,26 +15,34 @@ import { reverseGeocode } from '../utils/geocoding';
 
 const EMOJIS = ['🍗', '🍕', '🍔', '🌶️', '🍙', '🍲', '🍜', '🥘'];
 const COUNTS = [2, 3, 4, 5, 6];
+const DURATIONS = [
+  { mins: 30, label: '30분' },
+  { mins: 60, label: '1시간' },
+  { mins: 120, label: '2시간' },
+];
+const ADDRESS_PLACEHOLDER = '주소 변환 중...';
 
-export default function CustomPinModal({ visible, pin, userLocation, onClose, onConfirm }) {
-  const [address, setAddress] = useState('주소 변환 중...');
+export default function CustomPinModal({ visible, pin, userLocation, onClose, onConfirm, submitting }) {
+  const [address, setAddress] = useState(ADDRESS_PLACEHOLDER);
   const [poolName, setPoolName] = useState('');
   const [selectedEmoji, setSelectedEmoji] = useState('🍗');
   const [selectedCount, setSelectedCount] = useState(4);
+  const [durationMinutes, setDurationMinutes] = useState(30);
 
   useEffect(() => {
     if (visible && pin) {
-      setAddress('주소 변환 중...');
+      setAddress(ADDRESS_PLACEHOLDER);
       setPoolName('');
       setSelectedEmoji('🍗');
       setSelectedCount(4);
+      setDurationMinutes(30);
       reverseGeocode(pin.lat, pin.lng).then(setAddress);
     }
   }, [visible, pin]);
 
   if (!pin) return null;
   const dist = calcDistanceMeters(userLocation, pin);
-  const canConfirm = poolName.trim().length > 0;
+  const canConfirm = poolName.trim().length > 0 && !submitting;
 
   return (
     <Modal
@@ -136,12 +144,46 @@ export default function CustomPinModal({ visible, pin, userLocation, onClose, on
             </View>
           </View>
 
+          {/* 모집 시간 */}
+          <View style={styles.formGroup}>
+            <Text style={styles.formLabel}>모집 시간</Text>
+            <View style={styles.durationRow}>
+              {DURATIONS.map(({ mins, label }) => (
+                <Pressable
+                  key={mins}
+                  style={[
+                    styles.durationChip,
+                    durationMinutes === mins && styles.durationChipActive,
+                  ]}
+                  onPress={() => setDurationMinutes(mins)}
+                >
+                  <Text
+                    style={[
+                      styles.durationChipText,
+                      durationMinutes === mins && styles.durationChipTextActive,
+                    ]}
+                  >
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
           <Pressable
             style={[styles.confirmBtn, !canConfirm && styles.confirmBtnDisabled]}
             disabled={!canConfirm}
-            onPress={() => onConfirm(poolName.trim(), selectedEmoji, selectedCount)}
+            onPress={() => onConfirm(
+              poolName.trim(),
+              selectedEmoji,
+              selectedCount,
+              durationMinutes,
+              address === ADDRESS_PLACEHOLDER ? null : address,
+            )}
           >
-            <Text style={styles.confirmBtnText}>✓ 팟 만들기</Text>
+            <Text style={styles.confirmBtnText}>
+              {submitting ? '만드는 중...' : '✓ 팟 만들기'}
+            </Text>
           </Pressable>
         </ScrollView>
       </View>
@@ -269,6 +311,18 @@ const styles = StyleSheet.create({
   countBtnActive: { backgroundColor: COLORS.primary },
   countBtnText: { fontSize: 14, fontFamily: FONTS.bold, color: COLORS.text1 },
   countBtnTextActive: { color: 'white' },
+
+  durationRow: { flexDirection: 'row', gap: 8 },
+  durationChip: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: COLORS.surface2,
+    alignItems: 'center',
+  },
+  durationChipActive: { backgroundColor: COLORS.primary },
+  durationChipText: { fontSize: 13, fontFamily: FONTS.bold, color: COLORS.text1 },
+  durationChipTextActive: { color: 'white' },
 
   confirmBtn: {
     paddingVertical: 14,

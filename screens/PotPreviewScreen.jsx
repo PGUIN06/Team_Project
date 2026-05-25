@@ -7,11 +7,13 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
   ScrollView,
 } from 'react-native';
+// ※ react-native 기본 SafeAreaView는 iOS 노치만 처리하고 Android statusBar inset은 처리 안 함.
+//   fullScreenModal로 띄우면 Android에서 자체 헤더가 statusBar 뒤로 숨어 "닫기" 안 보임 → context 버전 사용.
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS } from '../utils/theme';
 import { supabase } from '../lib/supabase';
 import { joinPot } from '../lib/pots';
@@ -37,6 +39,7 @@ export default function PotPreviewScreen({ route, navigation, user, profile }) {
         .select(`
           id, name, emoji, spot_id, max_members, created_by,
           description, expires_at, status,
+          latitude, longitude, custom_address,
           pot_members(count)
         `)
         .eq('id', potId)
@@ -104,7 +107,15 @@ export default function PotPreviewScreen({ route, navigation, user, profile }) {
     );
   }
 
-  const spot = CAMPUS_SPOTS.find((s) => s.id === pot.spot_id);
+  const spot = pot.spot_id ? CAMPUS_SPOTS.find((s) => s.id === pot.spot_id) : null;
+  // 임의 위치 팟이면 한글 주소 또는 좌표 fallback
+  const placeLabel = spot
+    ? spot.name
+    : (pot.custom_address
+        || (pot.latitude != null && pot.longitude != null
+              ? `위도 ${Number(pot.latitude).toFixed(5)}, 경도 ${Number(pot.longitude).toFixed(5)}`
+              : '위치 정보 없음'));
+  const placePrefix = spot ? '📍 장소' : '📍 직접 찍은 위치';
   const timeLeft = formatTimeLeft(pot.expires_at);
   const expired = pot.expires_at && new Date(pot.expires_at) <= new Date();
   const full = pot.current >= pot.max;
@@ -126,9 +137,7 @@ export default function PotPreviewScreen({ route, navigation, user, profile }) {
 
         {/* 정보 카드 */}
         <View style={styles.infoCard}>
-          {spot && (
-            <InfoRow label="📍 장소" value={spot.name} />
-          )}
+          <InfoRow label={placePrefix} value={placeLabel} />
           <InfoRow
             label="👥 인원"
             value={`${pot.current} / ${pot.max}명`}

@@ -29,13 +29,19 @@ export default function NearbySheet({ expanded, onToggle, userLocation, pools, o
     }).start();
   }, [expanded]);
 
-  // 거리순 정렬
+  // 거리순 정렬 — 캠퍼스 팟은 spotId로 spot 찾고, 임의 위치 팟은 pot.latitude/longitude 직접 사용
   const sortedPools = (pools || [])
     .map((p) => {
-      const spot = CAMPUS_SPOTS.find((s) => s.id === p.spotId);
-      return { ...p, spot, dist: calcDistanceMeters(userLocation, spot) };
+      const spot = p.spotId ? CAMPUS_SPOTS.find((s) => s.id === p.spotId) : null;
+      const loc = spot
+        ? { lat: spot.lat, lng: spot.lng }
+        : (p.latitude != null && p.longitude != null
+            ? { lat: Number(p.latitude), lng: Number(p.longitude) }
+            : null);
+      return { ...p, spot, dist: loc ? calcDistanceMeters(userLocation, loc) : Infinity };
     })
-    .filter((p) => p.spot) // 좌표 못 찾은 팟은 제외 (커스텀 핀 등)
+    // 임의 위치 팟이 lat/lng 둘 다 없는 경우만 제외 (이론상 CHECK constraint로 막힘)
+    .filter((p) => p.spot || (p.latitude != null && p.longitude != null))
     .sort((a, b) => a.dist - b.dist);
 
   return (
@@ -77,6 +83,11 @@ export default function NearbySheet({ expanded, onToggle, userLocation, pools, o
   );
 }
 
+function spotLabel(pool) {
+  if (pool.spot) return pool.spot.short;
+  return '직접 찍은 위치';
+}
+
 function PoolRow({ pool, onPress }) {
   return (
     <Pressable style={styles.poolRow} onPress={onPress}>
@@ -86,7 +97,7 @@ function PoolRow({ pool, onPress }) {
       <View style={styles.poolInfo}>
         <Text style={styles.poolName} numberOfLines={1}>{pool.name}</Text>
         <Text style={styles.poolMeta}>
-          📍 {pool.spot.short} ·{' '}
+          📍 {spotLabel(pool)} ·{' '}
           <Text style={styles.poolDistance}>
             {formatDistance(pool.dist)} · {formatWalk(pool.dist)}
           </Text>
@@ -121,7 +132,7 @@ function PoolCard({ pool, onPress }) {
         </View>
       </View>
       <Text style={styles.poolCardName} numberOfLines={1}>{pool.name}</Text>
-      <Text style={styles.poolCardSpot}>📍 {pool.spot.short}</Text>
+      <Text style={styles.poolCardSpot} numberOfLines={1}>📍 {spotLabel(pool)}</Text>
       <View style={styles.poolCardBottom}>
         <Text style={styles.poolCount}>{pool.current}/{pool.max}</Text>
         <Text

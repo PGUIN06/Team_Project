@@ -144,7 +144,8 @@ export default function PotsScreen({ user, profile, navigation }) {
   };
 
   const renderPotCard = ({ item }) => {
-    const spot = CAMPUS_SPOTS.find((s) => s.id === item.spotId);
+    const spot = item.spotId ? CAMPUS_SPOTS.find((s) => s.id === item.spotId) : null;
+    const locationLabel = spot ? spot.name : '직접 찍은 위치';
     const statusLabel = formatPoolTimeStatus(item);
 
     return (
@@ -159,9 +160,7 @@ export default function PotsScreen({ user, profile, navigation }) {
           <Text style={styles.cardName} numberOfLines={1}>
             {item.name}
           </Text>
-          {spot && (
-            <Text style={styles.cardLocation}>📍 {spot.name}</Text>
-          )}
+          <Text style={styles.cardLocation} numberOfLines={1}>📍 {locationLabel}</Text>
           <View style={styles.cardMeta}>
             <Text style={styles.cardCount}>
               {item.current}/{item.max}명

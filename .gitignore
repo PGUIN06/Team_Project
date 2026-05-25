@@ -33,3 +33,6 @@ android/
 
 # Logs
 *.log
+
+# IDE / local config
+.claude/

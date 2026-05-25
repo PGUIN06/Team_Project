@@ -1,5 +1,5 @@
 // screens/MapScreen.jsx — 지도 화면 (App.js에서 분리)
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, StyleSheet, InteractionManager } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from '@react-navigation/native';
@@ -14,6 +14,7 @@ import {
 } from '../components/MapOverlays';
 import NearbySheet from '../components/NearbySheet';
 import SpotModal from '../components/SpotModal';
+import CustomPotModal from '../components/CustomPotModal';
 import CustomPinModal from '../components/CustomPinModal';
 import CreatePotModal from '../components/CreatePotModal';
 import Toast from '../components/Toast';
@@ -43,6 +44,7 @@ export default function MapScreen({ user, profile, navigation }) {
   const [placingMode, setPlacingMode] = useState(false);
   const [sheetExpanded, setSheetExpanded] = useState(false);
   const [selectedSpot, setSelectedSpot] = useState(null);
+  const [selectedCustomPot, setSelectedCustomPot] = useState(null);
   const [customPin, setCustomPin] = useState(null);
   const [toast, setToast] = useState(null);
 
@@ -54,6 +56,7 @@ export default function MapScreen({ user, profile, navigation }) {
   // 모달 state
   const [createPotSpot, setCreatePotSpot] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [creatingCustom, setCreatingCustom] = useState(false);
   const [activePot, setActivePot] = useState(null);
   const [myPotIds, setMyPotIds] = useState(new Set());  // 멤버십 (옵션 B)
 
@@ -115,6 +118,13 @@ export default function MapScreen({ user, profile, navigation }) {
     }, 60 * 1000);
     return () => clearInterval(interval);
   }, [user, refreshPots]);
+
+  // allPools에서 임의 위치 팟만 분리 (지도 마커 표시용)
+  // 캠퍼스 팟: spotId 있음 → 기존 spots 마커. 임의 팟: spotId 없음 → 노란 핀 마커.
+  const customPots = useMemo(
+    () => (allPools || []).filter((p) => !p.spotId && p.latitude != null && p.longitude != null),
+    [allPools]
+  );
 
   // 선택된 스팟의 활성 팟 목록 (SpotModal용)
   useEffect(() => {
@@ -213,24 +223,57 @@ export default function MapScreen({ user, profile, navigation }) {
     // (Realtime이 자동으로 카운트/목록 갱신)
   };
 
-  // 커스텀 핀 모달 확정 (지금은 토스트만 — 추후 createPot 호출로 확장 가능)
-  const handleCustomConfirm = (name, emoji, count) => {
-    showToast(`"${name}" 팟이 생성됐어요! 🎉`);
-    setCustomPin(null);
+  // 커스텀 핀 모달 확정 → 임의 위치 팟 실제 생성 (lat/lng/custom_address)
+  // CustomPinModal이 이미 reverseGeocode를 호출해서 address 결과를 같이 넘김 (중복 호출 방지)
+  // 변환 미완(placeholder)이면 address=null로 와서 custom_address는 NULL로 저장됨 (UX 안 막힘)
+  const handleCustomConfirm = async (name, emoji, count, durationMinutes, address) => {
+    if (!customPin || creatingCustom) return;
+    setCreatingCustom(true);
+    try {
+      const pot = await createPot({
+        name,
+        emoji,
+        latitude: customPin.lat,
+        longitude: customPin.lng,
+        customAddress: address || null,
+        maxMembers: count,
+        durationMinutes,
+      });
+      if (!pot) {
+        showToast('팟 생성 실패. 다시 시도해주세요.');
+        return;
+      }
+      showToast(`"${name}" 팟이 생성됐어요! 🎉`);
+      setCustomPin(null);
+      // (Realtime이 자동으로 카운트/목록 갱신)
+    } catch (err) {
+      // createPot의 위치 검증 throw 또는 예기치 못한 에러 — 모달 유지, 사용자가 재시도
+      showToast(`팟 생성 실패: ${err?.message || '알 수 없는 오류'}`);
+    } finally {
+      setCreatingCustom(false);
+    }
   };
 
   const handleCustomClose = () => {
+    if (creatingCustom) return;  // 만드는 중엔 닫기 무시 (race 방지)
     setCustomPin(null);
   };
 
+  // 임의 위치 팟 마커 클릭 → CustomPotModal 열기
+  const handleOpenCustomPot = (pot) => {
+    setSelectedCustomPot(pot);
+  };
+
   // 활성 팟 카드 → 멤버십/마감 여부에 따라 분기 (PotsScreen과 동일 패턴)
+  // SpotModal, CustomPotModal, NearbySheet 어디서 호출되어도 동일하게 작동.
   const handleOpenPotChat = (pot) => {
     if (!pot) return;
     const isMember = myPotIds.has(pot.id);
 
-    // 1) 멤버 → SpotModal 닫고 채팅방 바로 진입
+    // 1) 멤버 → 모달들 닫고 채팅방 바로 진입
     if (isMember) {
       setSelectedSpot(null);
+      setSelectedCustomPot(null);
       setActivePot(pot);
       return;
     }
@@ -242,7 +285,8 @@ export default function MapScreen({ user, profile, navigation }) {
     }
 
     // 3) 비멤버 + 모집중 → PotPreview (콜백으로 ref 저장 → focus 복귀 시 ChatScreen 띄움)
-    setSelectedSpot(null);  // SpotModal 닫기
+    setSelectedSpot(null);
+    setSelectedCustomPot(null);
     navigation?.navigate('PotPreview', {
       potId: pot.id,
       onJoined: (joinedPot) => {
@@ -261,10 +305,12 @@ export default function MapScreen({ user, profile, navigation }) {
         style={styles.map}
         spots={CAMPUS_SPOTS}
         poolCounts={poolCounts}
+        customPots={customPots}
         userLocation={userLocation}
         customPin={customPin}
         placingMode={placingMode}
         onSpotPress={handleSpotPress}
+        onCustomPotPress={handleOpenCustomPot}
         onMapPress={handleMapPress}
       />
 
@@ -306,10 +352,19 @@ export default function MapScreen({ user, profile, navigation }) {
         onShowToast={showToast}
       />
 
+      <CustomPotModal
+        visible={!!selectedCustomPot}
+        pot={selectedCustomPot}
+        userLocation={userLocation}
+        onClose={() => setSelectedCustomPot(null)}
+        onPotPress={handleOpenPotChat}
+      />
+
       <CustomPinModal
         visible={!!customPin}
         pin={customPin}
         userLocation={userLocation}
+        submitting={creatingCustom}
         onClose={handleCustomClose}
         onConfirm={handleCustomConfirm}
       />
