@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   // Pool counter
   poolCounter: {
     position: 'absolute',
-    top: 100,
+    top: 120,
     left: 16,
     zIndex: 5,
     backgroundColor: 'rgba(26, 26, 46, 0.92)',

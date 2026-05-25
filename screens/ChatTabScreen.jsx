@@ -11,19 +11,22 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { COLORS, FONTS } from '../utils/theme';
-import { fetchMyPots } from '../lib/pots';
+import { fetchMyPotsSorted } from '../lib/pots';
+import { supabase } from '../lib/supabase';
 import { CAMPUS_SPOTS } from '../data/campusData';
+import { formatChatTime } from '../utils/time';
 import ChatScreen from '../components/ChatScreen';
 import { usePotsRealtime } from '../hooks/usePotsRealtime';
 
-export default function ChatTabScreen({ user, profile }) {
+export default function ChatTabScreen({ user, profile, navigation, route }) {
   const [pots, setPots] = useState([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [activePot, setActivePot] = useState(null);
 
   const loadMyPots = useCallback(async () => {
-    const data = await fetchMyPots();
+    // 최근 메시지 시각 DESC 정렬 + joined_at fallback (서버 RPC가 처리)
+    const data = await fetchMyPotsSorted();
     setPots(data);
   }, []);
 
@@ -38,6 +41,30 @@ export default function ChatTabScreen({ user, profile }) {
 
   // Realtime — pots 테이블 변경 시 목록 자동 갱신
   usePotsRealtime(loadMyPots, !!user, 'pots-chat');
+
+  // Realtime — messages INSERT 시 재정렬 (새 메시지 온 방이 위로 이동)
+  // RLS가 본인 가입 팟의 메시지만 broadcast하니 본인 영향 받는 INSERT만 도달
+  useEffect(() => {
+    if (!user) return;
+    const uniqueName = `messages-chat-tab-${Math.random().toString(36).slice(2, 8)}`;
+    const channel = supabase
+      .channel(uniqueName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+        },
+        () => {
+          loadMyPots();  // 정렬 재계산은 서버 RPC가 처리
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, loadMyPots]);
 
   // 1분마다 자동 갱신 (시간 만료/곧 만료 상태 반영)
   useEffect(() => {
@@ -60,23 +87,51 @@ export default function ChatTabScreen({ user, profile }) {
 
   const renderPotCard = ({ item }) => {
     const spot = CAMPUS_SPOTS.find((s) => s.id === item.spot_id);
+    const hasMessage = !!item.lastMessageText;
+    const timeLabel = formatChatTime(item.lastMessageAt);
+
     return (
       <Pressable style={styles.card} onPress={() => handlePotPress(item)}>
         <View style={styles.cardEmojiWrap}>
           <Text style={styles.cardEmoji}>{item.emoji}</Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardName} numberOfLines={1}>
-            {item.name}
-          </Text>
+        <View style={styles.cardBody}>
+          {/* 1줄: 팟 이름 + 마지막 메시지 시각 */}
+          <View style={styles.cardTopRow}>
+            <Text style={styles.cardName} numberOfLines={1}>
+              {item.name}
+            </Text>
+            {timeLabel ? (
+              <Text style={styles.cardTime}>{timeLabel}</Text>
+            ) : null}
+          </View>
+
+          {/* 2줄: 장소 · 참여중 */}
           <View style={styles.cardMeta}>
             {spot && (
               <Text style={styles.cardLocation}>📍 {spot.short}</Text>
             )}
+            <Text style={styles.cardMetaDot}>·</Text>
             <Text style={styles.cardStatus}>참여중</Text>
           </View>
+
+          {/* 3줄: 마지막 메시지 미리보기 + 안 읽음 배지 (우측) */}
+          <View style={styles.cardBottomRow}>
+            <Text
+              style={[styles.cardPreview, !hasMessage && styles.cardPreviewEmpty]}
+              numberOfLines={1}
+            >
+              {hasMessage ? item.lastMessageText : '아직 메시지가 없습니다'}
+            </Text>
+            {item.unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadBadgeText}>
+                  {item.unreadCount > 99 ? '99+' : item.unreadCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
-        <Text style={styles.cardArrow}>›</Text>
       </Pressable>
     );
   };
@@ -143,7 +198,7 @@ const styles = StyleSheet.create({
   listContent: { padding: 16, paddingBottom: 80 },
   card: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',  // 3줄 카드라 위 정렬
     gap: 12,
     padding: 14,
     backgroundColor: COLORS.surface,
@@ -156,18 +211,39 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   cardEmojiWrap: {
-    width: 56, height: 56,
+    width: 48, height: 48,  // 카카오톡 프로필 느낌으로 살짝 작게 (56 → 48)
     backgroundColor: COLORS.surface2,
-    borderRadius: 16,
+    borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
   },
-  cardEmoji: { fontSize: 28 },
-  cardName: { fontSize: 15, fontFamily: FONTS.bold, color: COLORS.text1 },
+  cardEmoji: { fontSize: 24 },
+  cardBody: { flex: 1, minWidth: 0 },  // ellipsis 작동 위해 minWidth: 0 필수
+  cardTopRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  cardName: {
+    flex: 1,  // 이름 영역이 시각 영역 외 공간 차지
+    fontSize: 15,
+    fontFamily: FONTS.bold,
+    color: COLORS.text1,
+  },
+  cardTime: {
+    fontSize: 11,
+    color: COLORS.text3,
+    fontFamily: FONTS.medium,
+  },
   cardMeta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 6,
+    gap: 6,
+    marginTop: 4,
+  },
+  cardMetaDot: {
+    fontSize: 12,
+    color: COLORS.text3,
   },
   cardLocation: {
     fontSize: 12,
@@ -179,7 +255,36 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.bold,
     color: COLORS.primary,
   },
-  cardArrow: { fontSize: 24, color: COLORS.text3 },
+  cardBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 6,
+  },
+  cardPreview: {
+    flex: 1,  // 배지가 우측 자리 잡고 나머지 차지 (ellipsis 작동)
+    fontSize: 13,
+    color: COLORS.text2,
+    fontFamily: FONTS.medium,
+  },
+  cardPreviewEmpty: {
+    color: COLORS.text3,
+    fontStyle: 'italic',
+  },
+  unreadBadge: {
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 7,
+    borderRadius: 11,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unreadBadgeText: {
+    color: 'white',
+    fontSize: 11,
+    fontFamily: FONTS.bold,
+  },
   center: {
     flex: 1,
     alignItems: 'center',

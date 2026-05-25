@@ -4,6 +4,7 @@ import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Font from 'expo-font';
 import {
   NotoSansKR_400Regular,
@@ -18,8 +19,10 @@ import { COLORS, FONTS } from './utils/theme';
 import MapScreen from './screens/MapScreen';
 import PotsScreen from './screens/PotsScreen';
 import ChatTabScreen from './screens/ChatTabScreen';
+import PotPreviewScreen from './screens/PotPreviewScreen';
 
 const Tab = createBottomTabNavigator();
+const RootStack = createNativeStackNavigator();
 
 // 탭바 아이콘 (간단한 이모지/문자 기반)
 function TabIcon({ icon, color, focused }) {
@@ -90,42 +93,54 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <NavigationContainer>
-        <Tab.Navigator
-          screenOptions={({ route }) => ({
-            headerShown: false,
-            tabBarActiveTintColor: COLORS.primary,
-            tabBarInactiveTintColor: COLORS.text3,
-            tabBarStyle: styles.tabBar,
-            tabBarLabelStyle: styles.tabBarLabel,
-            tabBarIcon: ({ focused, color }) => {
-              const icons = {
-                Map: '🗺️',
-                Pots: '🍽️',
-                Chat: '💬',
-              };
-              return <TabIcon icon={icons[route.name]} color={color} focused={focused} />;
-            },
-          })}
-        >
-          <Tab.Screen
-            name="Map"
-            options={{ tabBarLabel: '지도' }}
+        <RootStack.Navigator screenOptions={{ headerShown: false }}>
+          <RootStack.Screen name="Tabs">
+            {() => (
+              <Tab.Navigator
+                screenOptions={({ route }) => ({
+                  headerShown: false,
+                  tabBarActiveTintColor: COLORS.primary,
+                  tabBarInactiveTintColor: COLORS.text3,
+                  tabBarStyle: styles.tabBar,
+                  tabBarLabelStyle: styles.tabBarLabel,
+                  tabBarIcon: ({ focused, color }) => {
+                    const icons = {
+                      Map: '🗺️',
+                      Pots: '🍽️',
+                      Chat: '💬',
+                    };
+                    return <TabIcon icon={icons[route.name]} color={color} focused={focused} />;
+                  },
+                })}
+              >
+                <Tab.Screen
+                  name="Map"
+                  options={{ tabBarLabel: '지도' }}
+                >
+                  {(props) => <MapScreen {...props} user={user} profile={profile} />}
+                </Tab.Screen>
+                <Tab.Screen
+                  name="Pots"
+                  options={{ tabBarLabel: '팟' }}
+                >
+                  {(props) => <PotsScreen {...props} user={user} profile={profile} />}
+                </Tab.Screen>
+                <Tab.Screen
+                  name="Chat"
+                  options={{ tabBarLabel: '채팅' }}
+                >
+                  {(props) => <ChatTabScreen {...props} user={user} profile={profile} />}
+                </Tab.Screen>
+              </Tab.Navigator>
+            )}
+          </RootStack.Screen>
+          <RootStack.Screen
+            name="PotPreview"
+            options={{ presentation: 'fullScreenModal' }}
           >
-            {() => <MapScreen user={user} profile={profile} />}
-          </Tab.Screen>
-          <Tab.Screen
-            name="Pots"
-            options={{ tabBarLabel: '팟' }}
-          >
-            {() => <PotsScreen user={user} profile={profile} />}
-          </Tab.Screen>
-          <Tab.Screen
-            name="Chat"
-            options={{ tabBarLabel: '채팅' }}
-          >
-            {() => <ChatTabScreen user={user} profile={profile} />}
-          </Tab.Screen>
-        </Tab.Navigator>
+            {(props) => <PotPreviewScreen {...props} user={user} profile={profile} />}
+          </RootStack.Screen>
+        </RootStack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
   );
