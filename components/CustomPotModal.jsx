@@ -11,11 +11,12 @@ import {
   Modal,
   TouchableWithoutFeedback,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { COLORS, FONTS } from '../utils/theme';
 import { calcDistanceMeters, formatDistance, formatWalk } from '../utils/distance';
 import { formatPoolTimeStatus } from '../utils/time';
 
-export default function CustomPotModal({ visible, pot, userLocation, onClose, onPotPress }) {
+export default function CustomPotModal({ visible, pot, userLocation, onClose, onPotPress, onShowToast }) {
   if (!pot) return null;
 
   const potLoc = { lat: Number(pot.latitude), lng: Number(pot.longitude) };
@@ -23,6 +24,14 @@ export default function CustomPotModal({ visible, pot, userLocation, onClose, on
   const addressText =
     pot.customAddress ||
     `위도 ${potLoc.lat.toFixed(5)}, 경도 ${potLoc.lng.toFixed(5)}`;
+
+  // 한글 주소 클립보드 복사 — SpotModal과 동일 패턴 (custom_address null이면 버튼 자체 숨김)
+  const handleCopy = async () => {
+    if (!pot.customAddress) return;
+    const text = `${pot.customAddress}\n\n※ 정확한 위치는 배달앱 "현재 위치로 찾기"로 확인해주세요`;
+    await Clipboard.setStringAsync(text);
+    onShowToast?.('✅ 복사 완료 — 배달앱 주소창에 붙여넣기!');
+  };
 
   return (
     <Modal
@@ -63,6 +72,20 @@ export default function CustomPotModal({ visible, pot, userLocation, onClose, on
             {!pot.customAddress && (
               <Text style={styles.addrWarn}>※ 주소 변환 결과가 없어 좌표로 표시합니다.</Text>
             )}
+          </View>
+
+          {/* 주소 복사 — SpotModal과 동일한 파란 버튼. custom_address 없으면 버튼 자체 숨김 */}
+          {pot.customAddress && (
+            <Pressable style={styles.copyBtn} onPress={handleCopy}>
+              <Text style={styles.copyBtnText}>📋 주소 복사하기</Text>
+            </Pressable>
+          )}
+
+          {/* 배달앱 "현재 위치 찾기" 활용 안내 */}
+          <View style={styles.deliveryTip}>
+            <Text style={styles.deliveryTipText}>
+              💡 팁: 배달앱 '현재 위치' 기능으로 더 정확하게 받을 수 있어요
+            </Text>
           </View>
         </View>
 
@@ -170,6 +193,34 @@ const styles = StyleSheet.create({
     color: COLORS.text3,
     marginTop: 4,
     fontFamily: FONTS.medium,
+  },
+  copyBtn: {
+    marginTop: 10,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+  },
+  copyBtnText: {
+    color: 'white',
+    fontSize: 13,
+    fontFamily: FONTS.bold,
+  },
+
+  deliveryTip: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: COLORS.surface2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  deliveryTipText: {
+    fontSize: 11,
+    color: COLORS.text2,
+    fontFamily: FONTS.medium,
+    lineHeight: 16,
   },
 
   body: { paddingHorizontal: 20, paddingBottom: 24 },
