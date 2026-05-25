@@ -86,7 +86,8 @@ export default function ChatTabScreen({ user, profile, navigation, route }) {
   };
 
   const renderPotCard = ({ item }) => {
-    const spot = CAMPUS_SPOTS.find((s) => s.id === item.spot_id);
+    const spot = item.spot_id ? CAMPUS_SPOTS.find((s) => s.id === item.spot_id) : null;
+    const locationLabel = spot ? spot.short : '직접 찍은 위치';
     const hasMessage = !!item.lastMessageText;
     const timeLabel = formatChatTime(item.lastMessageAt);
 
@@ -108,9 +109,7 @@ export default function ChatTabScreen({ user, profile, navigation, route }) {
 
           {/* 2줄: 장소 · 참여중 */}
           <View style={styles.cardMeta}>
-            {spot && (
-              <Text style={styles.cardLocation}>📍 {spot.short}</Text>
-            )}
+            <Text style={styles.cardLocation} numberOfLines={1}>📍 {locationLabel}</Text>
             <Text style={styles.cardMetaDot}>·</Text>
             <Text style={styles.cardStatus}>참여중</Text>
           </View>
