@@ -14,6 +14,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-navigation/bottom-tabs": "^7.16.1",
     "@react-navigation/native": "^7.2.4",
+    "@react-navigation/native-stack": "^7.15.1",
     "@supabase/supabase-js": "^2.106.1",
     "expo": "^56.0.3",
     "expo-asset": "~56.0.13",

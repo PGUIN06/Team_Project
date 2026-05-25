@@ -12,13 +12,15 @@ import {
 } from 'react-native';
 import { GiftedChat, Bubble, InputToolbar, Send } from 'react-native-gifted-chat';
 import { COLORS, FONTS } from '../utils/theme';
-import { fetchMessages, sendMessage, closePot } from '../lib/pots';
+import { fetchMessages, sendMessage, closePot, leavePot, markAsRead } from '../lib/pots';
 import { supabase } from '../lib/supabase';
 
 export default function ChatScreen({ visible, pot, currentUser, onClose }) {
   const [messages, setMessages] = useState([]);
+  // 헤더 멤버 수 — pot.current는 진입 시점 stale일 수 있어 자체 관리 + realtime 갱신
+  const [memberCount, setMemberCount] = useState(pot?.current ?? 0);
 
-  // 모달 열릴 때 기존 메시지 fetch
+  // 모달 열릴 때 기존 메시지 fetch + 진입 즉시 읽음 처리
   useEffect(() => {
     if (!visible || !pot?.id) {
       setMessages([]);
@@ -27,8 +29,88 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
     (async () => {
       const msgs = await fetchMessages(pot.id);
       setMessages(msgs);
+      // 진입 시점부터 last_read_at 갱신 (안 읽음 배지 즉시 0으로)
+      markAsRead(pot.id);
     })();
   }, [visible, pot?.id]);
+
+  // 방장이 팟 종료 시 모두에게 Alert + 채팅방 닫기 (방장 본인도 동일하게 처리)
+  // pots UPDATE 실시간 구독 — status='closed' 감지 시 발화
+  useEffect(() => {
+    if (!visible || !pot?.id) return;
+
+    const uniqueName = `pot-status-${pot.id}-${Math.random().toString(36).slice(2, 8)}`;
+    const channel = supabase
+      .channel(uniqueName)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'pots',
+          filter: `id=eq.${pot.id}`,
+        },
+        (payload) => {
+          if (payload.new?.status === 'closed') {
+            Alert.alert(
+              '팟 종료',
+              '방장이 팟을 종료했습니다.',
+              [{ text: '확인', onPress: () => onClose() }],
+              { cancelable: false }
+            );
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [visible, pot?.id, onClose]);
+
+  // 멤버 수 — 진입 시 정확한 값으로 fetch + pot_members 변경 실시간 구독
+  useEffect(() => {
+    if (!visible || !pot?.id) return;
+
+    // pot prop 변경 시 일단 prop 값으로 초기화 (stale일 수 있음)
+    setMemberCount(pot.current ?? 0);
+
+    let active = true;
+    const fetchCount = async () => {
+      const { count, error } = await supabase
+        .from('pot_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('pot_id', pot.id);
+      if (!active) return;
+      if (!error && count != null) setMemberCount(count);
+    };
+
+    // 진입 즉시 정확한 카운트
+    fetchCount();
+
+    // pot_members 변경 실시간 구독 — 다른 사람 join/leave 즉시 반영
+    const uniqueName = `pot-members-${pot.id}-${Math.random().toString(36).slice(2, 8)}`;
+    const channel = supabase
+      .channel(uniqueName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'pot_members',
+          filter: `pot_id=eq.${pot.id}`,
+        },
+        () => {
+          fetchCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [visible, pot?.id, pot?.current]);
 
   // Realtime 구독 — 다른 사람 메시지 실시간 수신
   useEffect(() => {
@@ -47,6 +129,9 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
         async (payload) => {
           // 본인이 보낸 메시지는 이미 낙관적 업데이트로 화면에 있음 → 무시
           if (payload.new.user_id === currentUser.id) return;
+
+          // 채팅방 보고 있으니 즉시 읽음 처리 (안 읽음 배지 안 쌓이게)
+          markAsRead(pot.id);
 
           // 닉네임 조회 (Realtime payload엔 join 결과 안 들어옴)
           const { data: profile } = await supabase
@@ -92,10 +177,14 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
     if (!saved) {
       setMessages((prev) => prev.filter((m) => m._id !== msg._id));
       console.warn('[chat] 메시지 전송 실패 (네트워크?)');
+      return;
     }
+
+    // 4) 본인 메시지도 읽음 처리 (RPC는 본인 메시지 제외하지만 안전망 + 다른 디바이스 본인 채팅 탭 동기화)
+    markAsRead(pot.id);
   }, [pot?.id]);
 
-  // 팟 종료 (방장만)
+  // 팟 종료 (방장만) — 성공 시 pots UPDATE 구독이 방장 본인 포함 모두에게 Alert + 닫기 처리
   const handleClose = () => {
     Alert.alert(
       '팟 종료',
@@ -107,10 +196,32 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
           style: 'destructive',
           onPress: async () => {
             const ok = await closePot(pot.id);
-            if (ok) {
-              onClose();  // 채팅방 모달 닫기
-            } else {
+            if (!ok) {
               Alert.alert('오류', '종료에 실패했어요. 잠시 후 다시 시도해주세요.');
+            }
+            // 성공 시 onClose 직접 호출 안 함 — UPDATE 구독이 "방장이 팟을 종료했습니다" Alert로 통합 처리
+          },
+        },
+      ]
+    );
+  };
+
+  // 팟에서 나가기 (일반 멤버용)
+  const handleLeave = () => {
+    Alert.alert(
+      '팟에서 나가기',
+      '이 팟에서 나가시겠습니까?\n다시 가입할 수 있어요.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '나가기',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await leavePot(pot.id);
+            if (ok) {
+              onClose();  // 채팅방 모달 닫기 → 부모가 채팅 탭으로 navigate
+            } else {
+              Alert.alert('오류', '나가기에 실패했어요. 잠시 후 다시 시도해주세요.');
             }
           },
         },
@@ -122,6 +233,14 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
   const isOwner =
     !!currentUser?.id &&
     (pot?.createdBy === currentUser.id || pot?.created_by === currentUser.id);
+
+  // 마감 여부 — 자체 계산 (prop의 pot.isClosed는 진입 시점 snapshot이라 stale)
+  // memberCount는 realtime 구독 중이라 멤버 나가서 부활하면 즉시 반영됨
+  // expired는 시간 기반이라 ChatScreen 안에서도 계속 마감 유지
+  const expired = pot?.expires_at && new Date(pot.expires_at) <= new Date();
+  const full = memberCount >= (pot?.max ?? Infinity);
+  const closedByOwner = pot?.status === 'closed';
+  const isClosedNow = expired || full || closedByOwner;
 
   if (!pot) return null;
 
@@ -143,24 +262,24 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
             <View style={{ flex: 1 }}>
               <View style={styles.nameRow}>
                 <Text style={styles.title} numberOfLines={1}>{pot.name}</Text>
-                {pot.isClosed && (
+                {isClosedNow && (
                   <View style={styles.closedBadge}>
                     <Text style={styles.closedBadgeText}>마감</Text>
                   </View>
                 )}
               </View>
               <Text style={styles.subtitle}>
-                {pot.current}/{pot.max}명
+                {memberCount}/{pot.max}명
               </Text>
             </View>
           </View>
-          {isOwner ? (
-            <Pressable onPress={handleClose} style={styles.menuBtn}>
-              <Text style={styles.menuText}>⋯</Text>
-            </Pressable>
-          ) : (
-            <View style={styles.backBtnPlaceholder} />
-          )}
+          {/* ⋯ 메뉴 — 방장은 "팟 종료", 일반 멤버는 "나가기" */}
+          <Pressable
+            onPress={isOwner ? handleClose : handleLeave}
+            style={styles.menuBtn}
+          >
+            <Text style={styles.menuText}>⋯</Text>
+          </Pressable>
         </View>
 
         {/* Chat */}

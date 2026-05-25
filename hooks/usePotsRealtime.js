@@ -8,16 +8,20 @@ import { supabase } from '../lib/supabase';
  * pots 테이블 변경을 실시간 구독
  * @param {() => void} onChange - 변경 감지 시 호출될 콜백 (보통 데이터 다시 fetch)
  * @param {boolean} [enabled=true] - 구독 활성화 여부 (예: 인증 끝나기 전엔 false)
- * @param {string} [channelName='pots-changes'] - 고유 채널 이름 (화면마다 달라야 함)
- *   Supabase의 channel(name)은 싱글톤 — 같은 이름 다시 호출 시 기존 인스턴스 반환되어
- *   subscribe된 채널에 .on() 추가 시 에러. 화면별 고유 이름 필수.
+ * @param {string} [channelName='pots-changes'] - 채널 이름 prefix (디버깅용)
+ *   주의: Supabase의 channel(name)은 싱글톤이라 화면이 unmount→re-mount되면
+ *   같은 이름으로 이미 subscribed된 인스턴스를 받아 .on() 추가가 거부됨.
+ *   → 매 useEffect 실행마다 random suffix 추가해서 항상 새 채널 보장.
  */
 export function usePotsRealtime(onChange, enabled = true, channelName = 'pots-changes') {
   useEffect(() => {
     if (!enabled) return;
 
+    // mount마다 unique 채널 이름 — 같은 화면 재mount 시 충돌 방지
+    const uniqueName = `${channelName}-${Math.random().toString(36).slice(2, 8)}`;
+
     const channel = supabase
-      .channel(channelName)
+      .channel(uniqueName)
       .on(
         'postgres_changes',
         {

@@ -1,7 +1,8 @@
 // screens/MapScreen.jsx — 지도 화면 (App.js에서 분리)
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, InteractionManager } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect } from '@react-navigation/native';
 import KakaoMapWebView from '../components/KakaoMapWebView';
 import * as Location from 'expo-location';
 import Header from '../components/Header';
@@ -24,6 +25,7 @@ import {
   fetchPotCounts,
   fetchPotsBySpot,
   fetchAllActivePots,
+  fetchMyPots,
   createPot,
   joinPot,
 } from '../lib/pots';
@@ -35,7 +37,7 @@ import {
  *   user      - Supabase auth user (App.js에서 인증 후 전달)
  *   profile   - profiles 테이블의 내 프로필 행
  */
-export default function MapScreen({ user, profile }) {
+export default function MapScreen({ user, profile, navigation }) {
   // ============ State ============
   const [userLocation, setUserLocation] = useState(CAMPUS_CENTER);
   const [placingMode, setPlacingMode] = useState(false);
@@ -53,18 +55,48 @@ export default function MapScreen({ user, profile }) {
   const [createPotSpot, setCreatePotSpot] = useState(null);
   const [creating, setCreating] = useState(false);
   const [activePot, setActivePot] = useState(null);
+  const [myPotIds, setMyPotIds] = useState(new Set());  // 멤버십 (옵션 B)
 
   const mapRef = useRef(null);
+  // PotPreview 콜백이 frozen 상태에서도 안전하게 데이터 전달 (PotsScreen과 동일 패턴)
+  const pendingChatPotRef = useRef(null);
+
+  // PotPreview 닫고 MapScreen으로 focus 복귀 시 ref 처리 (iOS modal dismiss 완료 대기)
+  useFocusEffect(
+    useCallback(() => {
+      if (!pendingChatPotRef.current) return;
+      const pot = pendingChatPotRef.current;
+      pendingChatPotRef.current = null;
+      InteractionManager.runAfterInteractions(() => {
+        setActivePot(pot);
+      });
+    }, [])
+  );
 
   // ============ Data fetching ============
-  // 모든 스팟 카운트 + 전체 활성 팟 (지도 마커 + NearbySheet용)
+  // selectedSpot을 ref로 캡처 — refreshPots를 stable하게 유지하면서 최신 값 접근
+  const selectedSpotRef = useRef(null);
+  useEffect(() => {
+    selectedSpotRef.current = selectedSpot;
+  }, [selectedSpot]);
+
+  // 모든 스팟 카운트 + 전체 활성 팟 + 내 멤버십 + (열려있다면) 선택된 스팟의 팟 목록까지 한꺼번에 갱신
+  // pot_members 변경 시 SpotModal의 카운트도 자동 반영
   const refreshPots = useCallback(async () => {
-    const [counts, all] = await Promise.all([
+    const [counts, all, mine] = await Promise.all([
       fetchPotCounts(),
       fetchAllActivePots(),
+      fetchMyPots(),
     ]);
     setPoolCounts(counts);
     setAllPools(all);
+    setMyPotIds(new Set(mine.map((p) => p.id)));
+
+    // SpotModal 열려있으면 spotPools도 같이 갱신 (stale 방지)
+    if (selectedSpotRef.current) {
+      const pools = await fetchPotsBySpot(selectedSpotRef.current.id);
+      setSpotPools(pools);
+    }
   }, []);
 
   useEffect(() => {
@@ -72,7 +104,7 @@ export default function MapScreen({ user, profile }) {
     refreshPots();
   }, [user, refreshPots]);
 
-  // Realtime — pots 변경 시 카운트/목록 자동 갱신
+  // Realtime — pots/pot_members 변경 시 카운트/목록/spotPools 자동 갱신
   usePotsRealtime(refreshPots, !!user, 'pots-map');
 
   // 1분마다 자동 갱신 (시간 만료/곧 만료 상태 반영)
@@ -191,16 +223,33 @@ export default function MapScreen({ user, profile }) {
     setCustomPin(null);
   };
 
-  // 활성 팟 카드 → 가입 + 채팅방 열기
-  const handleOpenPotChat = async (pot) => {
+  // 활성 팟 카드 → 멤버십/마감 여부에 따라 분기 (PotsScreen과 동일 패턴)
+  const handleOpenPotChat = (pot) => {
     if (!pot) return;
-    const ok = await joinPot(pot.id);
-    if (!ok) {
-      showToast('팟 가입 실패. 다시 시도해주세요.');
+    const isMember = myPotIds.has(pot.id);
+
+    // 1) 멤버 → SpotModal 닫고 채팅방 바로 진입
+    if (isMember) {
+      setSelectedSpot(null);
+      setActivePot(pot);
       return;
     }
-    setSelectedSpot(null);
-    setActivePot(pot);
+
+    // 2) 비멤버 + 마감 → 토스트 (자동 마감 fetch 필터링 때문에 거의 안 발생, 안전장치)
+    if (pot.isClosed) {
+      showToast('마감된 팟이에요');
+      return;
+    }
+
+    // 3) 비멤버 + 모집중 → PotPreview (콜백으로 ref 저장 → focus 복귀 시 ChatScreen 띄움)
+    setSelectedSpot(null);  // SpotModal 닫기
+    navigation?.navigate('PotPreview', {
+      potId: pot.id,
+      onJoined: (joinedPot) => {
+        pendingChatPotRef.current = joinedPot;
+        setMyPotIds((prev) => new Set([...prev, joinedPot.id]));
+      },
+    });
   };
 
   return (
@@ -241,7 +290,7 @@ export default function MapScreen({ user, profile }) {
           onToggle={() => setSheetExpanded(!sheetExpanded)}
           userLocation={userLocation}
           pools={allPools}
-          onSpotPress={handleSpotPress}
+          onPotPress={handleOpenPotChat}
         />
       )}
 
@@ -278,7 +327,10 @@ export default function MapScreen({ user, profile }) {
         visible={!!activePot}
         pot={activePot}
         currentUser={user && profile ? { id: user.id, nickname: profile.nickname } : null}
-        onClose={() => setActivePot(null)}
+        onClose={() => {
+          setActivePot(null);
+          navigation?.navigate('Tabs', { screen: 'Chat' });
+        }}
       />
 
       {/* 토스트 */}

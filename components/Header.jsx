@@ -88,12 +88,16 @@ const styles = StyleSheet.create({
     fontFamily: FONTS.display,
     fontSize: 16,
     color: COLORS.text1,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   brandSub: {
     fontSize: 10,
     color: COLORS.text3,
     fontFamily: FONTS.medium,
     marginTop: 2,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   iconBtn: {
     width: 40,

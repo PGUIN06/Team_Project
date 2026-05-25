@@ -1,5 +1,6 @@
 // screens/PotsScreen.jsx — 모집중인 팟 목록 + 카테고리 필터
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -10,12 +11,14 @@ import {
   RefreshControl,
   ActivityIndicator,
   SafeAreaView,
+  InteractionManager,
 } from 'react-native';
 import { COLORS, FONTS } from '../utils/theme';
-import { fetchPotsForList, joinPot } from '../lib/pots';
+import { fetchPotsForList, fetchMyPots } from '../lib/pots';
 import { CAMPUS_SPOTS } from '../data/campusData';
 import { formatPoolTimeStatus } from '../utils/time';
 import ChatScreen from '../components/ChatScreen';
+import Toast from '../components/Toast';
 import { usePotsRealtime } from '../hooks/usePotsRealtime';
 
 // 카테고리 정의 (emoji 기반 매핑)
@@ -30,46 +33,79 @@ const CATEGORIES = [
   { id: 'etc', label: '기타', emojis: ['☕', '🧁', '🥩'] },
 ];
 
-export default function PotsScreen({ user, profile }) {
+export default function PotsScreen({ user, profile, navigation }) {
   const [pots, setPots] = useState([]);
+  const [myPotIds, setMyPotIds] = useState(new Set());  // 내 멤버십 (옵션 B)
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activePot, setActivePot] = useState(null);
+  const [toast, setToast] = useState(null);
 
-  // 데이터 로드
+  // PotPreview 콜백이 frozen 상태에서도 안전하게 데이터 전달하는 통로
+  // (setState는 frozen에서 commit 안 될 수 있어서 ref + useFocusEffect 패턴 사용)
+  const pendingChatPotRef = useRef(null);
+
+  const showToast = (msg) => setToast({ msg, key: Date.now() });
+
+  // PotPreview 닫고 PotsScreen으로 focus 복귀 시 ref 처리
+  // iOS: modal dismiss animation(~300ms)이 끝나기 전에 setActivePot 하면
+  //      PotPreview modal 위에 ChatScreen modal이 못 그려짐 → InteractionManager로 대기
+  // Android: 거의 즉시 처리되지만 동일 코드 — 일관 동작
+  useFocusEffect(
+    useCallback(() => {
+      if (!pendingChatPotRef.current) return;
+      const pot = pendingChatPotRef.current;
+      pendingChatPotRef.current = null;
+      InteractionManager.runAfterInteractions(() => {
+        setActivePot(pot);
+      });
+    }, [])
+  );
+
+  // 데이터 로드 — 전체 팟 + 내 멤버십 (병렬)
   const loadPots = useCallback(async () => {
     const data = await fetchPotsForList();
     setPots(data);
   }, []);
 
+  const loadMyPotIds = useCallback(async () => {
+    const mine = await fetchMyPots();
+    setMyPotIds(new Set(mine.map((p) => p.id)));
+  }, []);
+
+  // Realtime + polling은 둘 다 같이 갱신해야 함
+  const refresh = useCallback(async () => {
+    await Promise.all([loadPots(), loadMyPotIds()]);
+  }, [loadPots, loadMyPotIds]);
+
   useEffect(() => {
     if (!user) return;
     (async () => {
       setLoading(true);
-      await loadPots();
+      await refresh();
       setLoading(false);
     })();
-  }, [user, loadPots]);
+  }, [user, refresh]);
 
-  // Realtime — pots 변경 시 목록 자동 갱신
-  usePotsRealtime(loadPots, !!user, 'pots-list');
+  // Realtime — pots/pot_members 변경 시 자동 갱신
+  usePotsRealtime(refresh, !!user, 'pots-list');
 
   // 1분마다 자동 갱신 (시간 만료/곧 만료 상태 반영)
   useEffect(() => {
     if (!user) return;
     const interval = setInterval(() => {
-      loadPots();
+      refresh();
     }, 60 * 1000);
     return () => clearInterval(interval);
-  }, [user, loadPots]);
+  }, [user, refresh]);
 
   // Pull to refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadPots();
+    await refresh();
     setRefreshing(false);
-  }, [loadPots]);
+  }, [refresh]);
 
   // 카테고리 필터링
   const filteredPots = pots.filter((pot) => {
@@ -79,16 +115,32 @@ export default function PotsScreen({ user, profile }) {
     return cat.emojis.includes(pot.emoji);
   });
 
-  // 팟 카드 누름 → (마감 아니면 가입 후) 채팅방
-  const handlePotPress = async (pot) => {
-    // 마감된 팟은 가입 시도 없이 바로 채팅방 (이미 멤버라면 입장, 아니면 ChatScreen 헤더만 보임)
-    if (pot.isClosed) {
+  // 팟 카드 누름 → 멤버십/마감 여부에 따라 분기
+  const handlePotPress = (pot) => {
+    const isMember = myPotIds.has(pot.id);
+
+    // 1) 멤버 → 채팅방 바로 진입 (모집중/마감 무관)
+    if (isMember) {
       setActivePot(pot);
       return;
     }
-    const ok = await joinPot(pot.id);
-    if (!ok) return;
-    setActivePot(pot);
+
+    // 2) 비멤버 + 마감 → 토스트만
+    if (pot.isClosed) {
+      showToast('마감된 팟이에요');
+      return;
+    }
+
+    // 3) 비멤버 + 모집중 → 미리보기 화면
+    // 참여 성공 시 onJoined 콜백이 ref에 저장 → focus 복귀 시 useFocusEffect가 ChatScreen 띄움
+    navigation.navigate('PotPreview', {
+      potId: pot.id,
+      onJoined: (joinedPot) => {
+        pendingChatPotRef.current = joinedPot;
+        // myPotIds 즉시 갱신 (Realtime이 곧 따라잡지만 즉시 반응성 위함)
+        setMyPotIds((prev) => new Set([...prev, joinedPot.id]));
+      },
+    });
   };
 
   const renderPotCard = ({ item }) => {
@@ -199,13 +251,25 @@ export default function PotsScreen({ user, profile }) {
         />
       )}
 
-      {/* Chat */}
+      {/* Chat — 닫으면 채팅 탭으로 이동 (요구사항: 어디서 열리든 닫기는 채팅 탭으로) */}
       <ChatScreen
         visible={!!activePot}
         pot={activePot}
         currentUser={user && profile ? { id: user.id, nickname: profile.nickname } : null}
-        onClose={() => setActivePot(null)}
+        onClose={() => {
+          setActivePot(null);
+          navigation.navigate('Tabs', { screen: 'Chat' });
+        }}
       />
+
+      {/* Toast */}
+      {toast && (
+        <Toast
+          key={toast.key}
+          message={toast.msg}
+          onDismiss={() => setToast(null)}
+        />
+      )}
     </SafeAreaView>
   );
 }

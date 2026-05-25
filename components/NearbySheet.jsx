@@ -18,7 +18,7 @@ const { height: SCREEN_H } = Dimensions.get('window');
 const COLLAPSED_H = 240;
 const EXPANDED_H = SCREEN_H * 0.6;
 
-export default function NearbySheet({ expanded, onToggle, userLocation, pools, onSpotPress }) {
+export default function NearbySheet({ expanded, onToggle, userLocation, pools, onPotPress }) {
   const heightAnim = useRef(new Animated.Value(COLLAPSED_H)).current;
 
   useEffect(() => {
@@ -67,10 +67,10 @@ export default function NearbySheet({ expanded, onToggle, userLocation, pools, o
       >
         {expanded
           ? sortedPools.map((p) => (
-              <PoolRow key={p.id} pool={p} onPress={() => onSpotPress(p.spot)} />
+              <PoolRow key={p.id} pool={p} onPress={() => onPotPress?.(p)} />
             ))
           : sortedPools.slice(0, 6).map((p) => (
-              <PoolCard key={p.id} pool={p} onPress={() => onSpotPress(p.spot)} />
+              <PoolCard key={p.id} pool={p} onPress={() => onPotPress?.(p)} />
             ))}
       </ScrollView>
     </Animated.View>
