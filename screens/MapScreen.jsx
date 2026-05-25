@@ -328,7 +328,12 @@ export default function MapScreen({ user, profile, navigation }) {
 
       <LocateButton onPress={locateUser} />
 
-      <FAB active={placingMode} onPress={() => setPlacingMode(!placingMode)} />
+      {/* NearbySheet expanded 시 FAB 숨김 (목록 가리지 않게) — placingMode 중엔 항상 표시 */}
+      <FAB
+        active={placingMode}
+        visible={placingMode || !sheetExpanded}
+        onPress={() => setPlacingMode(!placingMode)}
+      />
 
       {!placingMode && (
         <NearbySheet
@@ -358,6 +363,7 @@ export default function MapScreen({ user, profile, navigation }) {
         userLocation={userLocation}
         onClose={() => setSelectedCustomPot(null)}
         onPotPress={handleOpenPotChat}
+        onShowToast={showToast}
       />
 
       <CustomPinModal
@@ -367,6 +373,7 @@ export default function MapScreen({ user, profile, navigation }) {
         submitting={creatingCustom}
         onClose={handleCustomClose}
         onConfirm={handleCustomConfirm}
+        onShowToast={showToast}
       />
 
       <CreatePotModal

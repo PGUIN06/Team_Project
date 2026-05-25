@@ -54,10 +54,24 @@ export function LocateButton({ onPress }) {
 }
 
 // ============ FAB (여기서 같이 먹기) ============
-export function FAB({ active, onPress }) {
+// visible=false면 200ms fade out + 클릭 차단 (NearbySheet expanded 시 사용)
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+export function FAB({ active, visible = true, onPress }) {
+  const opacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.timing(opacity, {
+      toValue: visible ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [visible, opacity]);
+
   return (
-    <Pressable
-      style={[styles.fab, active && styles.fabActive]}
+    <AnimatedPressable
+      style={[styles.fab, active && styles.fabActive, { opacity }]}
+      pointerEvents={visible ? 'auto' : 'none'}
       onPress={onPress}
     >
       <Text style={styles.fabIcon}>🍽️</Text>
@@ -66,7 +80,7 @@ export function FAB({ active, onPress }) {
       >
         {active ? '취소' : '여기서 같이 먹기'}
       </Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -167,11 +181,12 @@ const styles = StyleSheet.create({
   },
   locateIcon: { fontSize: 22, color: COLORS.primary, fontWeight: '700' },
 
-  // FAB
+  // FAB — NearbySheet collapsed 위 가장자리(=240px)에서 16px 띄워 시각 분리
+  // expanded(60%)로 펼치면 시트에 가려지는데, 카카오맵/배달앱 일반 패턴이라 그대로 둠
   fab: {
     position: 'absolute',
     right: 16,
-    bottom: 220,
+    bottom: 256,
     zIndex: 8,
     paddingHorizontal: 18,
     paddingVertical: 14,

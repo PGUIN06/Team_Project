@@ -255,7 +255,8 @@ function buildHTML(apiKey) {
         var label = escapeHtml(s.label);
         var color = escapeHtml(s.color);
         var idAttr = escapeHtml(s.id);
-        var countTxt = s.count > 0 ? s.count : '';
+        // 0개 마커도 "0"을 항상 표시 — 일관성 (이전엔 0이면 빈 문자열로 숨김)
+        var countTxt = (s.count != null ? s.count : 0);
         var html =
           '<div class="m-wrap" onclick="window.__handleSpotClick(\\''+idAttr+'\\')">' +
             '<div class="m-pin" style="background:'+color+'"><span class="c">'+countTxt+'</span></div>' +

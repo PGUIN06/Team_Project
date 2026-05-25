@@ -3,6 +3,9 @@ import { View, Text, Pressable, StyleSheet, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, FONTS } from '../utils/theme';
 
+// 검색 기능 임시 숨김 — 추후 부활 시 true로 변경. 코드/스타일 모두 유지.
+const SHOW_SEARCH = false;
+
 export default function Header({ placingMode, onCancelPlacing, onSearch }) {
   const insets = useSafeAreaInsets();
   const topPad = Math.max(insets.top, 12);
@@ -42,9 +45,11 @@ export default function Header({ placingMode, onCancelPlacing, onSearch }) {
           <Text style={styles.brandSub}>대구대 경산캠퍼스</Text>
         </View>
       </View>
-      <Pressable style={styles.iconBtn} onPress={onSearch}>
-        <Text style={styles.searchIcon}>🔍</Text>
-      </Pressable>
+      {SHOW_SEARCH && (
+        <Pressable style={styles.iconBtn} onPress={onSearch}>
+          <Text style={styles.searchIcon}>🔍</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

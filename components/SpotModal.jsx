@@ -20,7 +20,9 @@ export default function SpotModal({ visible, spot, userLocation, pools, onClose,
   const dist = calcDistanceMeters(userLocation, spot);
 
   const handleCopy = async () => {
-    await Clipboard.setStringAsync(spot.deliveryAddress);
+    // 빈 줄 + 안내문 — 사용자가 메시지에 붙여넣을 때 깔끔
+    const text = `${spot.deliveryAddress}\n\n※ 정확한 위치는 배달앱 "현재 위치로 찾기"로 확인해주세요`;
+    await Clipboard.setStringAsync(text);
     onShowToast('✅ 복사 완료 — 배달앱 주소창에 붙여넣기!');
   };
 
@@ -79,6 +81,13 @@ export default function SpotModal({ visible, spot, userLocation, pools, onClose,
             <Pressable style={styles.copyBtn} onPress={handleCopy}>
               <Text style={styles.copyBtnText}>📋 주소 복사하기</Text>
             </Pressable>
+          </View>
+
+          {/* 배달앱 "현재 위치 찾기" 활용 안내 — 캠퍼스 안쪽이 같은 도로명을 공유해서 정확한 핀 필요 */}
+          <View style={styles.deliveryTip}>
+            <Text style={styles.deliveryTipText}>
+              💡 팁: 배달앱 '현재 위치' 기능으로 더 정확하게 받을 수 있어요
+            </Text>
           </View>
         </View>
 
@@ -224,6 +233,22 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 13,
     fontFamily: FONTS.bold,
+  },
+
+  deliveryTip: {
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: COLORS.surface2,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  deliveryTipText: {
+    fontSize: 11,
+    color: COLORS.text2,
+    fontFamily: FONTS.medium,
+    lineHeight: 16,
   },
 
   // Body
