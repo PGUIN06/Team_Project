@@ -19,7 +19,7 @@ import { fetchPotsForList, fetchMyPots } from '../lib/pots';
 import { CAMPUS_SPOTS } from '../data/campusData';
 import { formatPoolTimeStatus } from '../utils/time';
 import ChatScreen from '../components/ChatScreen';
-import Toast from '../components/Toast';
+import Toast from 'react-native-toast-message';
 import { usePotsRealtime } from '../hooks/usePotsRealtime';
 
 // 카테고리 정의 (emoji 기반 매핑)
@@ -41,13 +41,12 @@ export default function PotsScreen({ user, profile, navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activePot, setActivePot] = useState(null);
-  const [toast, setToast] = useState(null);
 
   // PotPreview 콜백이 frozen 상태에서도 안전하게 데이터 전달하는 통로
   // (setState는 frozen에서 commit 안 될 수 있어서 ref + useFocusEffect 패턴 사용)
   const pendingChatPotRef = useRef(null);
 
-  const showToast = (msg) => setToast({ msg, key: Date.now() });
+  const showToast = (msg) => Toast.show({ type: 'success', text1: msg });
 
   // PotPreview 닫고 PotsScreen으로 focus 복귀 시 ref 처리
   // iOS: modal dismiss animation(~300ms)이 끝나기 전에 setActivePot 하면
@@ -128,7 +127,7 @@ export default function PotsScreen({ user, profile, navigation }) {
 
     // 2) 비멤버 + 마감 → 토스트만
     if (pot.isClosed) {
-      showToast('마감된 팟이에요');
+      Toast.show({ type: 'potClosed', text1: '❌ 마감된 팟이에요' });
       return;
     }
 
@@ -262,14 +261,6 @@ export default function PotsScreen({ user, profile, navigation }) {
         }}
       />
 
-      {/* Toast */}
-      {toast && (
-        <Toast
-          key={toast.key}
-          message={toast.msg}
-          onDismiss={() => setToast(null)}
-        />
-      )}
     </SafeAreaView>
   );
 }

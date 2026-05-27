@@ -8,9 +8,9 @@ import {
   Pressable,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   ScrollView,
 } from 'react-native';
+import Toast from 'react-native-toast-message';
 // ※ react-native 기본 SafeAreaView는 iOS 노치만 처리하고 Android statusBar inset은 처리 안 함.
 //   fullScreenModal로 띄우면 Android에서 자체 헤더가 statusBar 뒤로 숨어 "닫기" 안 보임 → context 버전 사용.
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -65,13 +65,20 @@ export default function PotPreviewScreen({ route, navigation, user, profile }) {
 
     if (!ok) {
       // 17-d의 안전망이 막은 케이스 (마감/꽉참/race condition)
-      Alert.alert(
-        '참여할 수 없어요',
-        '팟이 마감되었거나 인원이 가득 찼어요. 잠시 후 다시 시도해주세요.',
-        [{ text: '확인' }]
-      );
+      Toast.show({
+        type: 'potClosed',
+        text1: '❌ 참여할 수 없어요',
+        text2: '팟이 마감되었거나 인원이 가득 찼어요',
+      });
       return;
     }
+
+    // 성공 토스트 — goBack 후 부모 화면 위에 글로벌로 표시됨
+    Toast.show({
+      type: 'potJoined',
+      text1: '🍗 팟 가입 완료!',
+      text2: `'${pot.name}' 채팅방으로 이동합니다`,
+    });
 
     // 성공 → 부모에 알림 (ref 저장) + 닫기
     // 부모(PotsScreen)는 useFocusEffect로 focus 복귀 시 ref 읽어 ChatScreen 띄움.
