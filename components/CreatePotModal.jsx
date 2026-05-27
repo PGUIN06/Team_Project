@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Modal,
   TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { COLORS, FONTS } from '../utils/theme';
 import { calcDistanceMeters, formatDistance, formatWalk } from '../utils/distance';
@@ -75,6 +77,12 @@ export default function CreatePotModal({ visible, spot, userLocation, onClose, o
           </View>
         </View>
 
+        {/* iOS 키보드 올라올 때 TextInput이 가려지는 것 방지 — transparent sheet라 offset 0 */}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
         <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 32 }}>
           {/* 팟 이름 */}
           <View style={styles.formGroup}>
@@ -172,6 +180,7 @@ export default function CreatePotModal({ visible, spot, userLocation, onClose, o
             </Text>
           </Pressable>
         </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
