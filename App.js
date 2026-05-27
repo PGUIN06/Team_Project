@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createBottomTabNavigator, BottomTabBar } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
 import * as Font from 'expo-font';
@@ -47,11 +47,16 @@ function TabIcon({ icon, color, focused }) {
 // tabBar 높이/paddingBottom을 Android navigation bar 높이에 맞춰 동적 처리
 function MainTabs({ user, profile }) {
   const insets = useSafeAreaInsets();
-  // react-native-edge-to-edge plugin이 정확한 inset 제공
-  // fallback 8은 plugin 적용 안 된 환경에서도 최소 보호 (gesture nav 최소 높이)
-  const bottomPad = insets.bottom > 0 ? insets.bottom : 8;
+  // Android edge-to-edge에서 navigation bar 인식. fallback 48 = 3-button nav 표준 높이.
+  const bottomPad = insets.bottom > 0 ? insets.bottom : 48;
   return (
     <Tab.Navigator
+      tabBar={(props) => (
+        // BottomTabBar를 View로 감싸서 paddingBottom 강제 적용 (자동 SafeArea 우회 케이스 대응)
+        <View style={{ backgroundColor: COLORS.surface, paddingBottom: bottomPad }}>
+          <BottomTabBar {...props} />
+        </View>
+      )}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: COLORS.primary,
@@ -60,9 +65,6 @@ function MainTabs({ user, profile }) {
           backgroundColor: COLORS.surface,
           borderTopWidth: 1,
           borderTopColor: COLORS.border,
-          height: 56 + bottomPad,
-          paddingTop: 6,
-          paddingBottom: bottomPad,
         },
         tabBarLabelStyle: {
           fontSize: 11,
