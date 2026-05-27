@@ -26,11 +26,13 @@
               "NSExceptionAllowsInsecureHTTPLoads": true
             }
           }
-        }
+        },
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.daegu.daepot",
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
@@ -39,7 +41,10 @@
     },
     "extra": {
       "kakaoRestApiKey": "YOUR_KAKAO_REST_API_KEY_HERE",
-      "kakaoJsApiKey": "YOUR_KAKAO_JS_API_KEY_HERE"
+      "kakaoJsApiKey": "YOUR_KAKAO_JS_API_KEY_HERE",
+      "eas": {
+        "projectId": "1d79bd9c-897c-4b8a-88e7-92216ffbf6e6"
+      }
     },
     "plugins": [
       [
@@ -48,10 +53,25 @@
           "locationAlwaysAndWhenInUsePermission": "내 주변 팟을 보여드리려면 위치 정보가 필요해요"
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "color": "#3B82F6"
+        }
+      ],
+      [
+        "react-native-edge-to-edge",
+        {
+          "android": {
+            "parentTheme": "Default"
+          }
+        }
+      ],
       "expo-asset",
       "expo-font",
       "expo-splash-screen",
       "expo-status-bar"
-    ]
+    ],
+    "owner": "pguin"
   }
 }

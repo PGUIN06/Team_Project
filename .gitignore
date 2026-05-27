@@ -36,3 +36,7 @@ android/
 
 # IDE / local config
 .claude/
+
+# Firebase (API key 포함 — 로컬에만 두고 EAS Build가 빌드 시 자동 업로드)
+google-services.json
+GoogleService-Info.plist

@@ -10,9 +10,10 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
-  SafeAreaView,
   InteractionManager,
 } from 'react-native';
+// Android statusBar inset 처리 위해 context 버전 사용 (react-native 기본은 iOS 노치만 처리)
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS } from '../utils/theme';
 import { fetchPotsForList, fetchMyPots } from '../lib/pots';
 import { CAMPUS_SPOTS } from '../data/campusData';
