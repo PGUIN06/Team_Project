@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Modal,
   TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { COLORS, FONTS } from '../utils/theme';
@@ -84,6 +86,12 @@ export default function CustomPinModal({ visible, pin, userLocation, onClose, on
           </View>
         </View>
 
+        {/* iOS 키보드 올라올 때 TextInput이 가려지는 것 방지 — transparent sheet라 offset 0 */}
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
         <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 32 }}>
           {/* 자동 주소 */}
           <View style={styles.autoAddrBox}>
@@ -209,6 +217,7 @@ export default function CustomPinModal({ visible, pin, userLocation, onClose, on
             </Text>
           </Pressable>
         </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );

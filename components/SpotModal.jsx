@@ -8,12 +8,15 @@ import {
   Modal,
   TouchableWithoutFeedback,
 } from 'react-native';
+// Modal 안에선 SafeAreaView가 작동 안 함 (Modal은 자체 root) → useSafeAreaInsets로 직접 bottom inset 받음
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { COLORS, FONTS } from '../utils/theme';
 import { calcDistanceMeters, formatDistance, formatWalk } from '../utils/distance';
 import { formatPoolTimeStatus } from '../utils/time';
 
 export default function SpotModal({ visible, spot, userLocation, pools, onClose, onCreatePool, onPotPress, onShowToast }) {
+  const insets = useSafeAreaInsets();
   if (!spot) return null;
 
   const spotPools = pools || [];
@@ -92,7 +95,10 @@ export default function SpotModal({ visible, spot, userLocation, pools, onClose,
         </View>
 
         {/* Body */}
-        <ScrollView style={styles.body} contentContainerStyle={{ paddingBottom: 24 }}>
+        <ScrollView
+          style={styles.body}
+          contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+        >
           {spotPools.length === 0 ? (
             <View style={styles.empty}>
               <Text style={styles.emptyEmoji}>🍽️</Text>

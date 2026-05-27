@@ -311,7 +311,8 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          // iOS Modal(pageSheet) + 커스텀 헤더(~60px) 고려한 offset — 0이면 입력창이 키보드 뒤로 숨음
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
         >
           <GiftedChat
             messages={messages}
