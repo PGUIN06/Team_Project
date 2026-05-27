@@ -1,0 +1,48 @@
+# .easignore — EAS Build에서 무시할 파일 목록
+# 있으면 .gitignore 무시되고 이 파일만 사용됨
+# .gitignore와 거의 동일하지만 google-services.json은 의도적으로 안 적음 (EAS에 업로드 필요)
+
+# Dependencies
+node_modules/
+.expo/
+dist/
+npm-debug.*
+web-build/
+
+# Native projects (EAS가 prebuild 자동 실행)
+ios/
+android/
+
+# Signing / credentials
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Environment files with secrets
+.env
+.env.local
+.env.*.local
+.env*.save
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Logs
+*.log
+
+# IDE / local config
+.claude/
+
+# Build artifacts
+build/
+
+# ⚠️ google-services.json은 일부러 적지 않음 — EAS Build에 업로드되어야 Firebase 셋업됨
+# .gitignore에서는 여전히 무시되어 git에 안 올라감

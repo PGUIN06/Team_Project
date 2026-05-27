@@ -8,8 +8,9 @@ import {
   FlatList,
   RefreshControl,
   ActivityIndicator,
-  SafeAreaView,
 } from 'react-native';
+// Android statusBar inset 처리 위해 context 버전 사용
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, FONTS } from '../utils/theme';
 import { fetchMyPotsSorted } from '../lib/pots';
 import { supabase } from '../lib/supabase';
@@ -80,6 +81,18 @@ export default function ChatTabScreen({ user, profile, navigation, route }) {
     await loadMyPots();
     setRefreshing(false);
   }, [loadMyPots]);
+
+  // 푸시 알림 Deep Link — App.js가 navigate 시 route.params.openPotId 넣어줌
+  // pots에 그 팟 있으면 즉시 ChatScreen 열고 params 클리어. 없으면 pots 변경(loadMyPots 완료) 시 재실행됨.
+  useEffect(() => {
+    const openPotId = route?.params?.openPotId;
+    if (!openPotId) return;
+    const pot = pots.find((p) => p.id === openPotId);
+    if (pot) {
+      setActivePot(pot);
+      navigation.setParams({ openPotId: undefined });
+    }
+  }, [route?.params?.openPotId, pots, navigation]);
 
   const handlePotPress = (pot) => {
     setActivePot(pot);
@@ -283,6 +296,10 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 11,
     fontFamily: FONTS.bold,
+    // Android 폰트 위쪽 padding 제거 + 세로 중앙 정렬 (정중앙 안 맞던 문제)
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+    lineHeight: 14,
   },
   center: {
     flex: 1,

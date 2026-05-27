@@ -5,11 +5,12 @@ import {
   Pressable,
   StyleSheet,
   Modal,
-  SafeAreaView,
   Platform,
   KeyboardAvoidingView,
   Alert,
 } from 'react-native';
+// Android statusBar + navigation bar inset 처리 (입력창 가려짐 + 헤더 정렬 동시 해결)
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { GiftedChat, Bubble, InputToolbar, Send } from 'react-native-gifted-chat';
 import { COLORS, FONTS } from '../utils/theme';
 import { fetchMessages, sendMessage, closePot, leavePot, markAsRead } from '../lib/pots';
@@ -285,7 +286,7 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
         {/* Chat */}
         <KeyboardAvoidingView
           style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
           <GiftedChat
