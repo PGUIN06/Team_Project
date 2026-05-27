@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { GiftedChat, Bubble, InputToolbar, Send } from 'react-native-gifted-chat';
 import { COLORS, FONTS } from '../utils/theme';
+import Toast from 'react-native-toast-message';
 import { fetchMessages, sendMessage, closePot, leavePot, markAsRead } from '../lib/pots';
 import { supabase } from '../lib/supabase';
 
@@ -101,8 +102,18 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
           table: 'pot_members',
           filter: `pot_id=eq.${pot.id}`,
         },
-        () => {
+        (payload) => {
           fetchCount();
+          // 새 멤버 가입 토스트 — 본인 가입은 제외 (Realtime은 본인 INSERT도 받음)
+          if (
+            payload.eventType === 'INSERT' &&
+            payload.new?.user_id !== currentUser?.id
+          ) {
+            Toast.show({
+              type: 'newMember',
+              text1: '👋 새 멤버가 가입했어요',
+            });
+          }
         }
       )
       .subscribe();
@@ -111,7 +122,7 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
       active = false;
       supabase.removeChannel(channel);
     };
-  }, [visible, pot?.id, pot?.current]);
+  }, [visible, pot?.id, pot?.current, currentUser?.id]);
 
   // Realtime 구독 — 다른 사람 메시지 실시간 수신
   useEffect(() => {
@@ -174,10 +185,15 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
     // 2) Supabase에 INSERT
     const saved = await sendMessage(pot.id, msg.text.trim());
 
-    // 3) 실패 시 롤백
+    // 3) 실패 시 롤백 + 토스트
     if (!saved) {
       setMessages((prev) => prev.filter((m) => m._id !== msg._id));
       console.warn('[chat] 메시지 전송 실패 (네트워크?)');
+      Toast.show({
+        type: 'daepotError',
+        text1: '⚠️ 메시지 전송 실패',
+        text2: '잠시 후 다시 시도해주세요',
+      });
       return;
     }
 
@@ -198,7 +214,11 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
           onPress: async () => {
             const ok = await closePot(pot.id);
             if (!ok) {
-              Alert.alert('오류', '종료에 실패했어요. 잠시 후 다시 시도해주세요.');
+              Toast.show({
+                type: 'daepotError',
+                text1: '⚠️ 종료 실패',
+                text2: '잠시 후 다시 시도해주세요',
+              });
             }
             // 성공 시 onClose 직접 호출 안 함 — UPDATE 구독이 "방장이 팟을 종료했습니다" Alert로 통합 처리
           },
@@ -222,7 +242,11 @@ export default function ChatScreen({ visible, pot, currentUser, onClose }) {
             if (ok) {
               onClose();  // 채팅방 모달 닫기 → 부모가 채팅 탭으로 navigate
             } else {
-              Alert.alert('오류', '나가기에 실패했어요. 잠시 후 다시 시도해주세요.');
+              Toast.show({
+                type: 'daepotError',
+                text1: '⚠️ 나가기 실패',
+                text2: '잠시 후 다시 시도해주세요',
+              });
             }
           },
         },

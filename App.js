@@ -7,6 +7,14 @@ import { createBottomTabNavigator, BottomTabBar } from '@react-navigation/bottom
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import * as Notifications from 'expo-notifications';
 import * as Font from 'expo-font';
+import Toast, {
+  BaseToast,
+  PotJoinedToast,
+  PotClosedToast,
+  NewMemberToast,
+  DaePotErrorToast,
+} from 'react-native-toast-message';
+
 import {
   NotoSansKR_400Regular,
   NotoSansKR_500Medium,
@@ -25,6 +33,18 @@ import PotPreviewScreen from './screens/PotPreviewScreen';
 
 const Tab = createBottomTabNavigator();
 const RootStack = createNativeStackNavigator();
+
+// 커스텀 토스트 4종 + 기본 success/error/info 매핑
+// 호출: Toast.show({ type: 'potJoined' | 'potClosed' | 'newMember' | 'daepotError' | 'success' | 'error' | 'info', text1, text2 })
+const toastConfig = {
+  success: (props) => <BaseToast {...props} style={{ borderLeftColor: '#69C779' }} />,
+  error: (props) => <DaePotErrorToast {...props} />,
+  info: (props) => <BaseToast {...props} style={{ borderLeftColor: '#87CEFA' }} />,
+  potJoined: (props) => <PotJoinedToast {...props} />,
+  potClosed: (props) => <PotClosedToast {...props} />,
+  newMember: (props) => <NewMemberToast {...props} />,
+  daepotError: (props) => <DaePotErrorToast {...props} />,
+};
 
 // 모듈 로드 시 1회 — 포그라운드 알림 표시 방식 설정 (앱 시작보다 빠른 시점)
 setupNotificationHandler();
@@ -208,6 +228,8 @@ export default function App() {
           </RootStack.Screen>
         </RootStack.Navigator>
       </NavigationContainer>
+      {/* 글로벌 토스트 — SafeAreaProvider 안에 두되 NavigationContainer 뒤에 둠 (z-order: 위에 그려짐) */}
+      <Toast config={toastConfig} />
     </SafeAreaProvider>
   );
 }

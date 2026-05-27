@@ -17,7 +17,7 @@ import SpotModal from '../components/SpotModal';
 import CustomPotModal from '../components/CustomPotModal';
 import CustomPinModal from '../components/CustomPinModal';
 import CreatePotModal from '../components/CreatePotModal';
-import Toast from '../components/Toast';
+import Toast from 'react-native-toast-message';
 import ChatScreen from '../components/ChatScreen';
 import { usePotsRealtime } from '../hooks/usePotsRealtime';
 import { CAMPUS_SPOTS, CAMPUS_CENTER } from '../data/campusData';
@@ -46,7 +46,6 @@ export default function MapScreen({ user, profile, navigation }) {
   const [selectedSpot, setSelectedSpot] = useState(null);
   const [selectedCustomPot, setSelectedCustomPot] = useState(null);
   const [customPin, setCustomPin] = useState(null);
-  const [toast, setToast] = useState(null);
 
   // Supabase 데이터
   const [poolCounts, setPoolCounts] = useState({});
@@ -140,7 +139,7 @@ export default function MapScreen({ user, profile, navigation }) {
 
   // ============ Handlers ============
   // 토스트
-  const showToast = (msg) => setToast({ msg, key: Date.now() });
+  const showToast = (msg) => Toast.show({ type: 'success', text1: msg });
 
   // GPS 권한 요청 & 위치 가져오기
   const locateUser = async () => {
@@ -280,7 +279,7 @@ export default function MapScreen({ user, profile, navigation }) {
 
     // 2) 비멤버 + 마감 → 토스트 (자동 마감 fetch 필터링 때문에 거의 안 발생, 안전장치)
     if (pot.isClosed) {
-      showToast('마감된 팟이에요');
+      Toast.show({ type: 'potClosed', text1: '❌ 마감된 팟이에요' });
       return;
     }
 
@@ -395,14 +394,6 @@ export default function MapScreen({ user, profile, navigation }) {
         }}
       />
 
-      {/* 토스트 */}
-      {toast && (
-        <Toast
-          key={toast.key}
-          message={toast.msg}
-          onDismiss={() => setToast(null)}
-        />
-      )}
     </View>
   );
 }
